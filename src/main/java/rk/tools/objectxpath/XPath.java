@@ -7,15 +7,13 @@ import rk.tools.objectxpath.xpath.NodeWithAttr;
 import rk.tools.objectxpath.xpath.NodeWithIndex;
 import rk.tools.objectxpath.xpath.XPathNode;
 
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 
 import static rk.tools.objectxpath.Commons.arrayListOf;
 import static rk.tools.objectxpath.Commons.transformList;
-import static rk.utils.reflection.ReflectionUtils.getAllFieldsOf;
-import static rk.utils.reflection.ReflectionUtils.getFieldValue;
+import static rk.utils.reflection.ReflectionUtils.*;
 
 public class XPath {
 
@@ -72,6 +70,40 @@ public class XPath {
     //todo support parent navigation /..
     //todo collection with null items
 
+    private Node getNodeWithIndex(Node root, int index) {
+        if (root.children.size() == 0) {
+            throw new IllegalStateException(root.path + " has no children"); //todo custom exception
+        }
+        if (index >= root.children.size()) {
+            throw new IllegalStateException(root.path + " has only " + root.children.size() + " children"); //todo custom exception
+        }
+        return root.children.get(index);
+    }
+
+    private Node getNodeWithAttribute(Node root, String attrName, Object attrValue) {
+        //todo primitive error
+        //todo allow custom type comparator?
+        if (isCollection(root.value)) { //todo add null support
+            Node foundNode = null;
+            for (Node item : root.children) {
+                String value = String.valueOf(getFieldValue(attrName, item.value));
+                if (Objects.equals(attrValue, value)) {
+                    foundNode = item;
+                    break;
+                }
+            }
+            if (foundNode == null) {
+                throw new IllegalStateException("couldn't find item with '" + attrName + "' = " + "'" + attrValue + "' in " + root.path); //todo custom exception
+            }
+            return foundNode;
+        }
+        String value = String.valueOf(getFieldValue(attrName, root.value));
+        if (Objects.equals(attrValue, value)) {
+            return root;
+        }
+        throw new IllegalStateException(root.path + " doesn't have attribute '" + attrName + "' with value " + "'" + attrValue + "'"); //todo custom exception
+    }
+
     public Object process(String xPath, Object object) {
         List<XPathNode> xPathNodes = parseXPath(xPath);
         Node root = objectToTree(object);
@@ -79,55 +111,26 @@ public class XPath {
             if (root.name.equals(xPathNode.name)) {
                 continue;
             }
-            Optional<Node> found = findNextNode(root, xPathNode);
-            if (found.isPresent()) {
-                root = found.get();
+            Optional<Node> node = findNextNode(root, xPathNode);
+            if (node.isPresent()) {
+                root = node.get();
             } else {
                 throw new IllegalStateException("couldn't find node by XPath " + xPath); //todo custom exception
             }
             if (xPathNode.getType() == NodeType.WITH_INDEX) {
-                int index = ((NodeWithIndex) xPathNode).index - 1;
-                if (root.children.size() == 0) {
-                    throw new IllegalStateException(root.path + " has no children"); //todo custom exception
-                }
-                if (index >= root.children.size()) {
-                    throw new IllegalStateException(root.path + " has only " + root.children.size() + " children"); //todo custom exception
-                }
-                root = root.children.get(index);
+                root = getNodeWithIndex(root, ((NodeWithIndex) xPathNode).index - 1);
                 continue;
             }
             if (xPathNode.getType() == NodeType.WITH_ATTRIBUTE) {
-                //todo primitive error
-                String attrName = ((NodeWithAttr) xPathNode).attrName;
-                Object attrValue = ((NodeWithAttr) xPathNode).attrValue;
-                //todo allow custom type comparator?
-                if (isCollection(root.value)) { //todo add null support
-                    Node foundNode = null;
-                    for (Node item : root.children) {
-                        String value = String.valueOf(getFieldValue(attrName, item.value));
-                        if (Objects.equals(attrValue, value)) {
-                            foundNode = item;
-                            break;
-                        }
-                    }
-                    if (foundNode != null) {
-                        root = foundNode;
-                        continue;
-                    }
-                    throw new IllegalStateException("couldn't find item with '" + attrName + "' = " + "'" + attrValue + "' in " + root.path); //todo custom exception
-                }
-                String value = String.valueOf(getFieldValue(attrName, root.value));
-                if (Objects.equals(attrValue, value)) {
-                    continue;
-                }
-                throw new IllegalStateException(root.path + " doesn't have attribute '" + attrName + "' with value " + "'" + attrValue + "'"); //todo custom exception
+                root = getNodeWithAttribute(root, ((NodeWithAttr) xPathNode).attrName,
+                        ((NodeWithAttr) xPathNode).attrValue);
             }
         }
         return root.value;
     }
 
     private Optional<Node> findAttribute(Node node, String name) {
-        for (Node attr : node.attributes) {
+        for (Node attr : node.children) {
             if (attr.name.equals(name)) {
                 return Optional.of(attr);
             }
@@ -153,30 +156,6 @@ public class XPath {
         return Optional.empty();
     }
 
-    private boolean isMap(Object object) {
-        return Map.class.isAssignableFrom(object.getClass());
-    }
-
-    //todo consider moving to ReflectionUtils
-    private boolean isCollection(Field field) {
-        return Collection.class.isAssignableFrom(field.getType());
-    }
-
-    private boolean isCollection(Object object) {
-        return Collection.class.isAssignableFrom(object.getClass());
-    }
-
-    //todo consider moving to ReflectionUtils
-    private boolean isMap(Field field) {
-        return Map.class.isAssignableFrom(field.getType());
-    }
-
-    //TODO allow to customize primitive types
-    private static boolean isPrimitive(Field field) {
-        Class type = field.getType();
-        return type.isPrimitive() || primitiveTypes.contains(type);
-    }
-
     //TODO allow to customize primitive types
     private static boolean isPrimitive(Object object) {
         Class type = object.getClass();
@@ -186,18 +165,6 @@ public class XPath {
     private String getNameFor(Object object) {
         String name = object.getClass().getSimpleName();
         return name.substring(0, 1).toLowerCase() + name.substring(1);
-    }
-
-    private List<Field> removePrimitiveFieldsFrom(List<Field> fields) {
-        List<Field> primitiveFields = arrayListOf();
-        fields.removeIf(field -> {
-            if (isPrimitive(field)) {
-                primitiveFields.add(field);
-                return true;
-            }
-            return false;
-        });
-        return primitiveFields;
     }
 
     /**
@@ -214,12 +181,8 @@ public class XPath {
         if (isPrimitive(object) || isMap(object) || isCollection(object)) {
             return root;
         }
-        List<Field> children = getAllFieldsOf(object);
-        List<Field> attributes = removePrimitiveFieldsFrom(children);
-        root.attributes = transformList(attributes, field ->
-                toNode(root, getFieldValue(field, object), field.getName(), null));
-        root.children = transformList(children, field ->
-                toNode(root, getFieldValue(field, object), field.getName(), null));
+        root.children = transformList(getAllFieldsOf(object),
+                field -> toNode(root, getFieldValue(field, object), field.getName(), null));
         return root;
     }
 
@@ -250,12 +213,8 @@ public class XPath {
             }
             return node;
         }
-        List<Field> children = getAllFieldsOf(value.getClass());
-        List<Field> attributes = removePrimitiveFieldsFrom(children);
-        node.attributes = transformList(attributes, field ->
-                toNode(node, getFieldValue(field, value), field.getName(), null));
-        node.children = transformList(children, field ->
-                toNode(node, getFieldValue(field, value), field.getName(), null));
+        node.children = transformList(getAllFieldsOf(value.getClass()),
+                field -> toNode(node, getFieldValue(field, value), field.getName(), null));
         return node;
     }
 
@@ -267,7 +226,6 @@ public class XPath {
         String name;
         String path;
         Object value;
-        List<Node> attributes = arrayListOf();
         List<Node> children = arrayListOf();
 
         @Override
