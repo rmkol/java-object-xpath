@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static rk.tools.objectxpath.Commons.print;
 
 class XPathTest {
     XPath xPath = new XPath();
@@ -119,7 +118,7 @@ class XPathTest {
     void getNextNode() {
         {
             String xpath = "//engine/@volume";
-            Optional<XPathNode> node_ = xPath.getNextNode(xpath);
+            Optional<XPathNode> node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             XPathNode node = node_.get();
             assertEquals("engine", node.name);
@@ -128,7 +127,7 @@ class XPathTest {
             assertEquals(8, node.endIndex);
 
             xpath = "/engine/@volume";
-            node_ = xPath.getNextNode(xpath);
+            node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             node = node_.get();
             assertEquals("engine", node.name);
@@ -140,7 +139,7 @@ class XPathTest {
         //with index
         {
             String xpath = "/gears[1]/@name";
-            Optional<XPathNode> node_ = xPath.getNextNode(xpath);
+            Optional<XPathNode> node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             NodeWithIndex node = (NodeWithIndex) node_.get();
             assertEquals("gears", node.name);
@@ -150,7 +149,7 @@ class XPathTest {
             assertEquals(1, node.index);
 
             xpath = "//gears[1]/@name";
-            node_ = xPath.getNextNode(xpath);
+            node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             node = (NodeWithIndex) node_.get();
             assertEquals("gears", node.name);
@@ -163,7 +162,7 @@ class XPathTest {
         //with attribute
         {
             String xpath = "/gears[@name='gear1']";
-            Optional<XPathNode> node_ = xPath.getNextNode(xpath);
+            Optional<XPathNode> node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             NodeWithAttr node = (NodeWithAttr) node_.get();
             assertEquals("gears", node.name);
@@ -174,7 +173,7 @@ class XPathTest {
             assertEquals("gear1", node.attrValue);
 
             xpath = "//gears[@name='gear1']";
-            node_ = xPath.getNextNode(xpath);
+            node_ = xPath.getNextXPathNode(xpath);
             assertTrue(node_.isPresent());
             node = (NodeWithAttr) node_.get();
             assertEquals("gears", node.name);

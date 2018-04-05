@@ -9,6 +9,7 @@ import rk.tools.objectxpath.xpath.XPathNode;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 
 import static rk.tools.objectxpath.Commons.arrayListOf;
@@ -17,30 +18,15 @@ import static rk.utils.reflection.ReflectionUtils.getAllFieldsOf;
 import static rk.utils.reflection.ReflectionUtils.getFieldValue;
 
 public class XPath {
+
+    static final Logger logger = Logger.getAnonymousLogger();
+
     static final List<NodeType> NODE_TYPES = arrayListOf(
             NodeType.WITH_ATTRIBUTE,
             NodeType.WITH_INDEX,
             NodeType.SIMPLE,
             NodeType.ATTRIBUTE
     );
-    static final String ONE = "/";
-    static final String DOUBLE = "//";
-
-    /**
-     * Primitive fields first.
-     */
-    private static final Comparator<Field> fieldsComparator = (f1, f2) -> {
-        if (isPrimitive(f1) && isPrimitive(f2)) {
-            return 0;
-        }
-        if (isPrimitive(f1)) {
-            return -1;
-        }
-        if (isPrimitive(f2)) {
-            return 1;
-        }
-        return 0;
-    };
 
     /**
      * {@link Set} of wrapper types considered as 'primitive'.
@@ -59,7 +45,7 @@ public class XPath {
         primitiveTypes.add(String.class);
     }
 
-    Optional<XPathNode> getNextNode(String xPath) {
+    Optional<XPathNode> getNextXPathNode(String xPath) {
         for (NodeType nodeType : NODE_TYPES) {
             Matcher matcher = nodeType.patternChild.matcher(xPath);
             if (nodeType.matches(matcher)) {
@@ -72,7 +58,7 @@ public class XPath {
     List<XPathNode> parseXPath(String xPath) {
         List<XPathNode> nodes = arrayListOf();
         Optional<XPathNode> node_;
-        while ((node_ = getNextNode(xPath)).isPresent()) {
+        while ((node_ = getNextXPathNode(xPath)).isPresent()) {
             XPathNode node = node_.get();
             nodes.add(node);
             xPath = xPath.substring(node.endIndex);
@@ -84,6 +70,7 @@ public class XPath {
     //todo collect multiple results of //
     //todo support any node - * (previous item must be implemented)
     //todo support parent navigation /..
+    //todo collection with null items
 
     public Object process(String xPath, Object object) {
         List<XPathNode> xPathNodes = parseXPath(xPath);
@@ -114,10 +101,10 @@ public class XPath {
                 String attrName = ((NodeWithAttr) xPathNode).attrName;
                 Object attrValue = ((NodeWithAttr) xPathNode).attrValue;
                 //todo allow custom type comparator?
-                if (isCollection(root.field)) { //todo null field
+                if (isCollection(root.value)) { //todo add null support
                     Node foundNode = null;
                     for (Node item : root.children) {
-                        String value = String.valueOf(getFieldValue(attrName, item.holder));
+                        String value = String.valueOf(getFieldValue(attrName, item.value));
                         if (Objects.equals(attrValue, value)) {
                             foundNode = item;
                             break;
@@ -129,14 +116,14 @@ public class XPath {
                     }
                     throw new IllegalStateException("couldn't find item with '" + attrName + "' = " + "'" + attrValue + "' in " + root.path); //todo custom exception
                 }
-                String value = String.valueOf(getFieldValue(attrName, getFieldValue(root.field, root.holder)));
+                String value = String.valueOf(getFieldValue(attrName, root.value));
                 if (Objects.equals(attrValue, value)) {
                     continue;
                 }
                 throw new IllegalStateException(root.path + " doesn't have attribute '" + attrName + "' with value " + "'" + attrValue + "'"); //todo custom exception
             }
         }
-        return root.value();
+        return root.value;
     }
 
     private Optional<Node> findAttribute(Node node, String name) {
@@ -222,79 +209,53 @@ public class XPath {
     private Node objectToTree(Object object) {
         Node root = new Node();
         root.name = getNameFor(object);
-        root.holder = object;
+        root.value = object;
         root.path = "/" + root.name;
         if (isPrimitive(object) || isMap(object) || isCollection(object)) {
             return root;
         }
-        List<Field> fields = getAllFieldsOf(object);
-        List<Field> primitiveFields = removePrimitiveFieldsFrom(fields);
-        root.attributes = transformList(primitiveFields, field -> fieldToNode(root, field));
-        root.children = transformList(fields, field -> fieldToNode(root, field));
+        List<Field> children = getAllFieldsOf(object);
+        List<Field> attributes = removePrimitiveFieldsFrom(children);
+        root.attributes = transformList(attributes, field ->
+                toNode(root, getFieldValue(field, object), field.getName(), null));
+        root.children = transformList(children, field ->
+                toNode(root, getFieldValue(field, object), field.getName(), null));
         return root;
     }
 
-    private Node fieldToNode(Node parent, Field field) {
-        Node node = new Node();
-        node.name = field.getName();
-        node.holder = parent.field == null
-                ? parent.holder
-                : getFieldValue(parent.field, parent.holder);
-        node.path = parent.path + "/" + node.name;
-        node.field = field;
-        node.parent = parent;
-        if (isPrimitive(field)) {
-            return node;
-        }
-        if (isMap(field)) {
-            return node; //todo populate children somehow
-        }
-        if (isCollection(field)) {
-            Collection collection = (Collection) getFieldValue(field, node.holder);
-            if (null == collection) {
-                return node;
-            }
-            Iterator iterator = collection.iterator();
-            int i = 1;
-            while (iterator.hasNext()) {
-                Object item = iterator.next();
-                node.children.add(objectToNode(node, item, i++));
-            }
-            return node;
-        }
-        List<Field> children = getAllFieldsOf(field.getType());
-        List<Field> attributes = removePrimitiveFieldsFrom(children);
-        node.attributes = transformList(attributes, field_ -> fieldToNode(node, field_));
-        node.children = transformList(children, field_ -> fieldToNode(node, field_));
-        return node;
-    }
+    private Node toNode(Node parent, Object value, String name, Integer index) {
+        logger.info("processing node " + name + " with parent " + parent);
 
-    private Node objectToNode(Node parent, Object object, int index) {
         Node node = new Node();
-        node.name = getNameFor(object);
-        node.holder = object;
-        node.path = parent.path + "/" + node.name + "[" + index + "]";
+        node.name = name;
+        node.value = value;
+        node.path = index == null
+                ? parent.path + "/" + name
+                : parent.path + "/" + name + "[" + index + "]";
         node.parent = parent;
-        if (isPrimitive(object)) {
+        if (null == value || isPrimitive(value)) {
             return node;
         }
-        if (isMap(object)) {
+        if (isMap(value)) {
             return node; //todo populate children somehow
         }
-        if (isCollection(object)) {
-            Collection collection = (Collection) object;
+        if (isCollection(value)) {
+            Collection collection = (Collection) value;
             Iterator iterator = collection.iterator();
             int i = 1;
             while (iterator.hasNext()) {
                 Object item = iterator.next();
-                node.children.add(objectToNode(node, item, i++));
+                //todo add null support here
+                node.children.add(toNode(node, item, getNameFor(item), i++));
             }
             return node;
         }
-        List<Field> children = getAllFieldsOf(object.getClass());
+        List<Field> children = getAllFieldsOf(value.getClass());
         List<Field> attributes = removePrimitiveFieldsFrom(children);
-        node.attributes = transformList(attributes, field_ -> fieldToNode(node, field_));
-        node.children = transformList(children, field_ -> fieldToNode(node, field_));
+        node.attributes = transformList(attributes, field ->
+                toNode(node, getFieldValue(field, value), field.getName(), null));
+        node.children = transformList(children, field ->
+                toNode(node, getFieldValue(field, value), field.getName(), null));
         return node;
     }
 
@@ -305,16 +266,13 @@ public class XPath {
         Node parent;
         String name;
         String path;
-        Field field;
-        Object holder;
+        Object value;
         List<Node> attributes = arrayListOf();
         List<Node> children = arrayListOf();
 
-        public Object value() {
-            if (field == null) { //field may be null in cases when node was created for an object, not for a field
-                return holder;
-            }
-            return getFieldValue(field, holder);
+        @Override
+        public String toString() {
+            return path;
         }
     }
 }
