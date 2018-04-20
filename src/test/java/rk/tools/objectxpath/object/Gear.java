@@ -5,6 +5,7 @@ import java.util.List;
 public class Gear {
     private String id;
     public String name;
+    public double weight;
     public List<Characteristic> characteristics;
 
     public String getId() {

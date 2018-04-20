@@ -5,11 +5,6 @@ import rk.tools.objectxpath.NodeType;
 
 public class AttributeNode extends XPathNode {
     public AttributeNode(String name, int startIndex, int endIndex) {
-        super(NodeRelationship.CHILD, name, startIndex, endIndex);
-    }
-
-    @Override
-    public NodeType getType() {
-        return NodeType.ATTRIBUTE;
+        super(NodeType.ATTRIBUTE, NodeRelationship.CHILD, name, startIndex, endIndex);
     }
 }

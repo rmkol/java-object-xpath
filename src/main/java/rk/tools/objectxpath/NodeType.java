@@ -2,7 +2,7 @@ package rk.tools.objectxpath;
 
 import rk.tools.objectxpath.xpath.AttributeNode;
 import rk.tools.objectxpath.xpath.XPathNode;
-import rk.tools.objectxpath.xpath.NodeWithAttr;
+import rk.tools.objectxpath.xpath.NodeWithAttribute;
 import rk.tools.objectxpath.xpath.NodeWithIndex;
 
 import java.util.regex.Matcher;
@@ -12,6 +12,18 @@ import java.util.regex.Pattern;
  * Represents different XPath node types.
  */
 public enum NodeType {
+    ROOT("(^/$)", "") {
+        @Override
+        public XPathNode create(Matcher matcher) {
+            return new XPathNode(
+                    ROOT,
+                    nodeRelationship(matcher),
+                    nodeName(matcher),
+                    nodeStartIndex(matcher),
+                    nodeEndIndex(matcher)
+            );
+        }
+    },
     /**
      * Simple node which is identified only by name.
      * <p>'/car'</p>
@@ -20,6 +32,7 @@ public enum NodeType {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
+                    SIMPLE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -53,7 +66,7 @@ public enum NodeType {
         public XPathNode create(Matcher matcher) {
             String attr = matcher.group(2);
             Object attrValue = matcher.group(3);
-            return new NodeWithAttr(
+            return new NodeWithAttribute(
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),

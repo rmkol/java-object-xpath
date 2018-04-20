@@ -1,0 +1,56 @@
+<sedan trunkSize="10.5" serialNumber="1111">
+    <details>
+        <d1>
+            details1
+        </d1>
+        <d2>
+            details2
+        </d2>
+    </details>
+    <gears>
+        <Gear id="111" name="gear_1" weight="1.2">
+            <characteristics>
+                <Characteristic id="11" details="model:1">
+                </Characteristic>
+                <Characteristic id="22" details="size:1">
+                </Characteristic>
+            </characteristics>
+        </Gear>
+        <Gear id="112" name="gear_2" weight="1.5">
+            <characteristics>
+            </characteristics>
+        </Gear>
+        <Gear id="113" name="gear_3" weight="1.2">
+            <characteristics>
+                <Characteristic id="13" details="model:12">
+                </Characteristic>
+                <Characteristic id="14" details="size:1">
+                </Characteristic>
+            </characteristics>
+        </Gear>
+    </gears>
+    <countryCodes>
+        <item>
+            55
+        </item>
+        <item>
+            77
+        </item>
+    </countryCodes>
+    <engine volume="2.0">
+        <valve id="15" name="valve">
+        </valve>
+        <gears>
+            <Gear id="311" name="gear_31" weight="11">
+                <characteristics>
+                    <Characteristic id="331" details="color:red">
+                    </Characteristic>
+                    <Characteristic id="332" details="sn:22">
+                    </Characteristic>
+                    <Characteristic id="333" details="year:2000">
+                    </Characteristic>
+                </characteristics>
+            </Gear>
+        </gears>
+    </engine>
+</sedan>

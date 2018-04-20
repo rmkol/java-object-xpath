@@ -8,7 +8,7 @@ public class NodeWithIndex extends XPathNode {
 
     public NodeWithIndex(NodeRelationship relationship, String name, int startIndex,
                          int endIndex, int index) {
-        super(relationship, name, startIndex, endIndex);
+        super(NodeType.WITH_INDEX, relationship, name, startIndex, endIndex);
         this.index = index;
     }
 
