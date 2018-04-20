@@ -7,6 +7,8 @@ import rk.tools.objectxpath.exception.InvalidXPathExpressionError;
 import rk.tools.objectxpath.xpath.NodeWithAttribute;
 import rk.tools.objectxpath.xpath.NodeWithIndex;
 import rk.tools.objectxpath.xpath.XPathNode;
+import rk.utils.reflection.ReflectionUtils;
+import rk.utils.reflection.exception.FieldNotFoundError;
 
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
@@ -88,57 +90,20 @@ public class XXPath {
     //todo collection with null items
     //todo map support
 
-    /**
-     * Extracts a child node with specific index.
-     *
-     * @param node  parent node
-     * @param index index of a child node
-     * @return found child node
-     */
-    private Optional<Node> getChildNode(Node node, int index) {
-        if (node.children.size() == 0) {
-            return Optional.empty();
-        }
-        if (index >= node.children.size()) {
-            return Optional.empty();
-        }
-        return Optional.of(node.children.get(index));
+    private boolean nodeHasAttribute(Node node, String attrName, Object attrValue) {
+        Optional<String> value = getFieldValue(attrName, node.value);
+        //todo allow custom type comparator?
+        return value.filter(s -> Objects.equals(attrValue, s)).isPresent();
     }
 
-    /**
-     * Finds a node with a specific attribute.
-     * If provided node represents a simple object,
-     * then the method will check that it has an attribute with
-     * provided name and value. Otherwise exception will be thrown.
-     * <p>
-     * If provided node represents a collection
-     * then the method will try to find an item which
-     * has an attribute with provided name and value. Otherwise
-     * Exception will be thrown.
-     *
-     * @param node      specific object tree node
-     * @param attrName  some attribute name
-     * @param attrValue some attribute value
-     * @return matching node
-     */
-    private List<Node> getNodeWithAttribute(Node node, String attrName, Object attrValue) {
-        //todo primitive error
-        //todo allow custom type comparator?
-        List<Node> result = arrayListOf();
-        if (isCollection(node.value)) { //todo add null support
-            for (Node item : node.children) {
-                String value = string(getFieldValue(attrName, item.value));
-                if (Objects.equals(attrValue, value)) {
-                    result.add(item);
-                }
-            }
-            return result;
+    private Optional<Node> getNodeWithIndex(List<Node> nodes, int index) {
+        if (nodes.size() == 0) {
+            return Optional.empty();
         }
-        String value = string(getFieldValue(attrName, node.value));
-        if (Objects.equals(attrValue, value)) {
-            result.add(node);
+        if (index >= nodes.size()) {
+            return Optional.empty();
         }
-        return result;
+        return Optional.of(nodes.get(index));
     }
 
     public Object process(String xPath, Object object) {
@@ -148,35 +113,52 @@ public class XXPath {
         List<Node> result = arrayListOf();
         while (xPathNodes.size() > 0) {
             XPathNode xPathNode = xPathNodes.remove(0);
+            boolean lastXpathNode = xPathNodes.isEmpty();
             if (xPathNode.type == NodeType.ROOT) {
                 result.add(nodes.get(0));
                 break;
             }
             for (Node node : Lists.removeAll(nodes)) {
                 List<Node> descendants = findNextNode(node, xPathNode);
-                for (Node descendant : descendants) {
-                    node = descendant;
-                    if (xPathNode.type == NodeType.WITH_INDEX) {
-                        Optional<Node> child = getChildNode(node, ((NodeWithIndex) xPathNode).index - 1);
+                if (descendants.size() == 1) {
+                    node = descendants.get(0);
+                    if (xPathNode.type == NodeType.WITH_INDEX) { //one node returned, pick a child with index
+                        int index = ((NodeWithIndex) xPathNode).index - 1;
+                        Optional<Node> child = getNodeWithIndex(node.children, index);
                         if (child.isPresent()) {
                             nodes.add(child.get());
-                            if (xPathNodes.size() == 0) { //last XPath node
+                            if (lastXpathNode) {
                                 result.add(child.get());
                             }
                         }
-                    } else if (xPathNode.type == NodeType.WITH_ATTRIBUTE) {
-                        List<Node> _nodes = getNodeWithAttribute(node, ((NodeWithAttribute) xPathNode).attrName,
-                                ((NodeWithAttribute) xPathNode).attrValue);
-                        nodes.addAll(_nodes);
-                        if (xPathNodes.size() == 0) { //last XPath node
-                            result.addAll(_nodes);
-                        }
-                    } else {
+                        continue;
+                    }
+                    if (nodeMatchesXpathNode(node, xPathNode)) {
                         nodes.add(node);
-                        if (xPathNodes.size() == 0) { //last XPath node
+                        if (lastXpathNode) {
                             result.add(node);
                         }
                     }
+                } else {
+                    if (xPathNode.type == NodeType.WITH_INDEX) { //multiple nodes returned, pick a node with index
+                        int index = ((NodeWithIndex) xPathNode).index - 1;
+                        Optional<Node> _node = getNodeWithIndex(descendants, index);
+                        if (_node.isPresent()) {
+                            nodes.add(_node.get());
+                            if (lastXpathNode) {
+                                result.add(_node.get());
+                            }
+                        }
+                        continue;
+                    }
+                    descendants.forEach(_node -> {
+                        if (nodeMatchesXpathNode(_node, xPathNode)) {
+                            nodes.add(_node);
+                            if (lastXpathNode) {
+                                result.add(_node);
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -190,6 +172,23 @@ public class XXPath {
         return result.stream()
                 .map(node -> node.value)
                 .collect(Collectors.toList());
+    }
+
+    private boolean nodeMatchesXpathNode(Node node, XPathNode xPathNode) {
+        if (xPathNode.type == NodeType.WITH_ATTRIBUTE) {
+            return nodeHasAttribute(node, ((NodeWithAttribute) xPathNode).attrName,
+                    ((NodeWithAttribute) xPathNode).attrValue);
+        }
+        return true;
+    }
+
+    private Optional<String> getFieldValue(String fieldName, Object holder) {
+        try {
+            Object value = ReflectionUtils.getFieldValue(fieldName, holder);
+            return Optional.ofNullable(string(value));
+        } catch (FieldNotFoundError fieldNotFoundError) {
+            return Optional.empty();
+        }
     }
 
     private void checkXpathExpression(String expression) throws InvalidXPathExpressionError {
@@ -207,7 +206,7 @@ public class XXPath {
                 nodes.add(attr);
             }
             if (xPathNode.relationship == NodeRelationship.DESCENDANT) {
-                attr.children.forEach(child->{
+                attr.children.forEach(child -> {
                     nodes.addAll(findAttributeNode(child, xPathNode));
                 });
             }
@@ -246,7 +245,8 @@ public class XXPath {
             return root;
         }
         root.children = transformList(getAllFieldsOf(object),
-                field -> toNode(root, getFieldValue(field, object), field.getName(), null));
+                field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
+                        field.getName(), null));
         return root;
     }
 
@@ -278,7 +278,8 @@ public class XXPath {
             return node;
         }
         node.children = transformList(getAllFieldsOf(value.getClass()),
-                field -> toNode(node, getFieldValue(field, value), field.getName(), null));
+                field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
+                        field.getName(), null));
         return node;
     }
 
@@ -294,7 +295,7 @@ public class XXPath {
     }
 
     private String string(Object object) {
-        return String.valueOf(object);
+        return object == null ? null : String.valueOf(object);
     }
 
     /**

@@ -98,20 +98,23 @@ class XPathTest {
         Object result;
         List list;
 
-//        result = xxPath.process("//engine/@volume", sedan);
-//        assertEquals(2.0D, result);
-//
-//        result = xxPath.process("/gears[1]/characteristics[2]", sedan);
-//        assertEquals(sedan.getGears().get(0).characteristics.get(1), result);
-//
-//        result = xxPath.process("/gears[@id='111']/characteristics", sedan);
-//        assertEquals(sedan.getGears().get(0).characteristics, result);
-//
-//        result = xxPath.process("/gears[1]//characteristics[1]/@details", sedan);
-//        assertEquals(sedan.getGears().get(0).characteristics.get(0).details, result);
+        result = xxPath.process("//engine/@volume", sedan);
+        assertEquals(2.0D, result);
+
+        result = xxPath.process("/gears[1]/characteristics[2]", sedan);
+        assertEquals(sedan.getGears().get(0).characteristics.get(1), result);
+
+        result = xxPath.process("/gears[@id='111']/characteristics", sedan);
+        assertNull(result);
+
+        result = xxPath.process("/gears/gear[@id='111']/characteristics", sedan);
+        assertEquals(sedan.getGears().get(0).characteristics, result);
+
+        result = xxPath.process("/gears[1]//characteristics[1]/@details", sedan);
+        assertEquals(sedan.getGears().get(0).characteristics.get(0).details, result);
 
         result = xxPath.process("//gears[1]//characteristics[2]/@details", sedan);
-        assertEquals(sedan.getGears().get(0).characteristics.get(1).details, result);
+        assertNull(result);
 
         result = xxPath.process("/countryCodes[1]", sedan);
         assertEquals(sedan.countryCodes.get(0), result);
@@ -128,8 +131,14 @@ class XPathTest {
         result = xxPath.process("/engine[@volume='2.0']", sedan);
         assertEquals(sedan.engine, result);
 
-        result = xxPath.process("/engine//characteristics", sedan);
+        result = xxPath.process("/engine/characteristics", sedan);
         assertNull(result);
+
+        list = (List) xxPath.process("/engine//characteristics", sedan);
+        assertEquals(3, list.size());
+        assertEquals(sedan.engine.gears.get(0).characteristics.get(0), list.get(0));
+        assertEquals(sedan.engine.gears.get(0).characteristics.get(1), list.get(1));
+        assertEquals(sedan.engine.gears.get(0).characteristics.get(2), list.get(2));
 
         result = xxPath.process("//valve", sedan);
         assertEquals(sedan.engine.valve, result);
