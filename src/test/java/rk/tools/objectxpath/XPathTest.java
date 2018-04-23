@@ -96,6 +96,11 @@ class XPathTest {
     //todo map with number key
     //todo collection as root
 
+
+    @Test
+    void test() {
+    }
+
     @Test
     void listAsRoot() {
         List<String> list = arrayListOf("h1", "h2");
@@ -213,9 +218,11 @@ class XPathTest {
         result = processXpath("//valve/@name");
         assertEquals(sedan.engine.valve.name, result);
 
-        //root
         result = processXpath("/");
         assertEquals(sedan, result);
+
+        list = (List) processXpath("//@weight");
+        assertEquals(5, list.size());
 
         //multiple items
         {

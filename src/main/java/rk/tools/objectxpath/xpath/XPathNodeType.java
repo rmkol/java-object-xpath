@@ -145,6 +145,7 @@ public enum XPathNodeType {
             String attribute = matcher.group(1);
             return new AttributeNode(
                     attribute,
+                    nodeRelationship(matcher),
                     nodeStartIndex(matcher),
                     nodeEndIndex(matcher)
             );
