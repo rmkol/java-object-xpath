@@ -75,7 +75,7 @@ public enum XPathNodeType {
      * Simple node which is identified only by name.
      * <p>'/car'</p>
      */
-    SIMPLE("/([a-zA-Z]+)", "//([a-zA-Z]+)") {
+    SIMPLE("/([a-zA-Z0-9]+)", "//([a-zA-Z0-9]+)") {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
@@ -91,7 +91,7 @@ public enum XPathNodeType {
      * A node which is identified by name and index.
      * <p>'/car[2]'</p>
      */
-    WITH_INDEX("/([a-zA-Z]+)\\[([0-9]+)]", "//([a-zA-Z]+)\\[([0-9]+)]") {
+    WITH_INDEX("/([a-zA-Z0-9]+)\\[([0-9]+)]", "//([a-zA-Z0-9]+)\\[([0-9]+)]") {
         @Override
         public XPathNode create(Matcher matcher) {
             int nodeIndex = Integer.parseInt(matcher.group(2));
@@ -109,7 +109,7 @@ public enum XPathNodeType {
      * A node which is identified by name and some attribute's value.
      * <p>'/car[@model='m1']'</p>
      */
-    WITH_ATTRIBUTE("/([a-zA-Z]+)\\[@(.*)='(.*)']", "//([a-zA-Z]+)\\[@(.*)='(.*)']") {
+    WITH_ATTRIBUTE("/([a-zA-Z0-9]+)\\[@(.*)='(.*)']", "//([a-zA-Z0-9]+)\\[@(.*)='(.*)']") {
         @Override
         public XPathNode create(Matcher matcher) {
             String attr = matcher.group(2);
@@ -129,7 +129,7 @@ public enum XPathNodeType {
      * Attribute node.
      * <p>'/car/@model'</p>
      */
-    ATTRIBUTE("/@([a-zA-Z]+)", "//@([a-zA-Z]+)") {
+    ATTRIBUTE("/@([a-zA-Z0-9]+)", "//@([a-zA-Z0-9]+)") {
         @Override
         public XPathNode create(Matcher matcher) {
             String attribute = matcher.group(1);

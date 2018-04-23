@@ -196,16 +196,27 @@ class XPathTest {
             assertTrue(list.stream().anyMatch(o -> sedan.engine.gears.equals(o)));
         }
 
+        //maps
+        {
+            result = processXpath("/details/d1");
+            assertEquals(sedan.details.get("d1"), result);
+
+            result = processXpath("/details/d2");
+            assertEquals(sedan.details.get("d2"), result);
+
+            result = processXpath("/details/d3");
+            assertNull(result);
+        }
+
         // //Characteristic[@details='size:1']/../..
     }
 
     @Test
     void testOne() {
         List list;
-        list = (List) processXpath("/engine/*");
-        assertEquals(2, list.size());
-        assertTrue(list.stream().anyMatch(o -> sedan.engine.valve.equals(o)));
-        assertTrue(list.stream().anyMatch(o -> sedan.engine.gears.equals(o)));
+        Object result;
+        result = processXpath("/details/d1");
+        assertEquals(sedan.details.get("d1"), result);
     }
 
     Object processXpath(String xPath) {
@@ -216,6 +227,7 @@ class XPathTest {
     //todo map with complex key
     //todo empty with complex key
     //todo map of map? :O
+    //todo map with weird keys
 
     void checkInvalidXpath(String xPath) {
         try {
