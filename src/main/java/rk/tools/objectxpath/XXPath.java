@@ -300,6 +300,9 @@ public class XXPath {
 
     private void processCollectionNode(Node node) {
         Collection collection = (Collection) node.value;
+        if (collection.size() > 0) {
+            node.children = new ArrayList<>(collection.size());
+        }
         int i = 1;
         for (Object item : collection) {
             if (item != null) {
@@ -311,6 +314,9 @@ public class XXPath {
     private void processMapNode(Node node) {
         //todo map key type (string or number)
         Map map = (Map) node.value;
+        if (map.size() > 0) {
+            node.children = new ArrayList<>(map.size());
+        }
         //todo do not use stream here for performance reasons? (iterator instead)
         map.keySet().stream().findFirst().ifPresent(key -> {
             if (isPrimitive(key)) {
@@ -372,8 +378,8 @@ public class XXPath {
         String name;
         String path;
         Object value;
-        List<Node> attributes = arrayListOf();
-        List<Node> children = arrayListOf();
+        List<Node> attributes = emptyList();
+        List<Node> children = emptyList();
 
         @Override
         public String toString() {
