@@ -59,7 +59,7 @@ public class XXPath {
      */
     private Optional<XPathNode> findNextXPathNode(String xPath) {
         for (XPathNodeType nodeType : NODE_TYPES) {
-            Matcher matcher = nodeType.patternChild.matcher(xPath);
+            Matcher matcher = nodeType.pattern.matcher(xPath);
             if (nodeType.matches(matcher)) {
                 return Optional.of(nodeType.create(matcher));
             }
