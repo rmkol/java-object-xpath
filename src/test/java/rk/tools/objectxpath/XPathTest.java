@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static rk.tools.objectxpath.Commons.arrayListOf;
 import static rk.tools.objectxpath.Commons.print;
 
@@ -98,72 +99,72 @@ class XPathTest {
         Object result;
         List list;
 
-        result = xxPath.process("//engine/@volume", sedan);
+        result = processXpath("//engine/@volume");
         assertEquals(2.0D, result);
 
-        result = xxPath.process("/gears[1]/characteristics[2]", sedan);
+        result = processXpath("/gears[1]/characteristics[2]");
         assertEquals(sedan.getGears().get(0).characteristics.get(1), result);
 
-        result = xxPath.process("/gears[@id='111']/characteristics", sedan);
+        result = processXpath("/gears[@id='111']/characteristics");
         assertNull(result);
 
-        result = xxPath.process("/gears/gear[@id='111']/characteristics", sedan);
+        result = processXpath("/gears/gear[@id='111']/characteristics");
         assertEquals(sedan.getGears().get(0).characteristics, result);
 
-        result = xxPath.process("/gears[1]//characteristics[1]/@details", sedan);
+        result = processXpath("/gears[1]//characteristics[1]/@details");
         assertEquals(sedan.getGears().get(0).characteristics.get(0).details, result);
 
-        result = xxPath.process("//gears[1]//characteristics[2]/@details", sedan);
+        result = processXpath("//gears[1]//characteristics[2]/@details");
         assertNull(result);
 
-        result = xxPath.process("/countryCodes[1]", sedan);
+        result = processXpath("/countryCodes[1]");
         assertEquals(sedan.countryCodes.get(0), result);
 
-        result = xxPath.process("/countryCodes[2]", sedan);
+        result = processXpath("/countryCodes[2]");
         assertEquals(sedan.countryCodes.get(1), result);
 
-        result = xxPath.process("/gears[2]//characteristics", sedan);
+        result = processXpath("/gears[2]//characteristics");
         assertEquals(sedan.getGears().get(1).characteristics, result);
 
-        result = xxPath.process("/engine", sedan);
+        result = processXpath("/engine");
         assertEquals(sedan.engine, result);
 
-        result = xxPath.process("/engine[@volume='2.0']", sedan);
+        result = processXpath("/engine[@volume='2.0']");
         assertEquals(sedan.engine, result);
 
-        result = xxPath.process("/engine/characteristics", sedan);
+        result = processXpath("/engine/characteristics");
         assertNull(result);
 
-        list = (List) xxPath.process("/engine//characteristics", sedan);
+        list = (List) processXpath("/engine//characteristics");
         assertEquals(3, list.size());
         assertEquals(sedan.engine.gears.get(0).characteristics.get(0), list.get(0));
         assertEquals(sedan.engine.gears.get(0).characteristics.get(1), list.get(1));
         assertEquals(sedan.engine.gears.get(0).characteristics.get(2), list.get(2));
 
-        result = xxPath.process("//valve", sedan);
+        result = processXpath("//valve");
         assertEquals(sedan.engine.valve, result);
 
-        result = xxPath.process("//valve/@name", sedan);
+        result = processXpath("//valve/@name");
         assertEquals(sedan.engine.valve.name, result);
 
         //root
-        result = xxPath.process("/", sedan);
+        result = processXpath("/");
         assertEquals(sedan, result);
 
         //multiple items
         {
-            list = (List) xxPath.process("//characteristic[@details='size:1']", sedan);
+            list = (List) processXpath("//characteristic[@details='size:1']");
             assertEquals(2, list.size());
             assertEquals(sedan.getGears().get(0).characteristics.get(1), list.get(0));
             assertEquals(sedan.getGears().get(2).characteristics.get(1), list.get(1));
 
-            list = (List) xxPath.process("/gears//gear", sedan);
+            list = (List) processXpath("/gears//gear");
             assertEquals(3, list.size());
             assertEquals(sedan.getGears().get(0), list.get(0));
             assertEquals(sedan.getGears().get(1), list.get(1));
             assertEquals(sedan.getGears().get(2), list.get(2));
 
-            list = (List) xxPath.process("//characteristic", sedan);
+            list = (List) processXpath("//characteristic");
             assertEquals(7, list.size());
             assertEquals(sedan.getGears().get(0).characteristics.get(0), list.get(0));
             assertEquals(sedan.getGears().get(0).characteristics.get(1), list.get(1));
@@ -176,21 +177,39 @@ class XPathTest {
 
         //any node *
         {
-            list = (List) xxPath.process("/*", sedan);
+            list = (List) processXpath("/*");
             assertEquals(4, list.size());
             assertEquals(sedan.details, list.get(0));
             assertEquals(sedan.getGears(), list.get(1));
             assertEquals(sedan.countryCodes, list.get(2));
             assertEquals(sedan.engine, list.get(3));
 
-            list = (List) xxPath.process("//*", sedan);
+            list = (List) processXpath("//*");
             assertEquals(25, list.size());
 
-            result = xxPath.process("//*[@details='sn:22']", sedan);
+            result = processXpath("//*[@details='sn:22']");
             assertEquals(sedan.engine.gears.get(0).characteristics.get(1), result);
+
+            list = (List) processXpath("/engine/*");
+            assertEquals(2, list.size());
+            assertTrue(list.stream().anyMatch(o -> sedan.engine.valve.equals(o)));
+            assertTrue(list.stream().anyMatch(o -> sedan.engine.gears.equals(o)));
         }
 
         // //Characteristic[@details='size:1']/../..
+    }
+
+    @Test
+    void testOne() {
+        List list;
+        list = (List) processXpath("/engine/*");
+        assertEquals(2, list.size());
+        assertTrue(list.stream().anyMatch(o -> sedan.engine.valve.equals(o)));
+        assertTrue(list.stream().anyMatch(o -> sedan.engine.gears.equals(o)));
+    }
+
+    Object processXpath(String xPath) {
+        return xxPath.process(xPath, sedan);
     }
 
     //todo empty map
@@ -200,7 +219,7 @@ class XPathTest {
 
     void checkInvalidXpath(String xPath) {
         try {
-            xxPath.process(xPath, sedan);
+            processXpath(xPath);
         } catch (InvalidXPathExpressionError e) {
             return;
         }
