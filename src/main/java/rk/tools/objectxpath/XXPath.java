@@ -14,22 +14,23 @@ import rk.utils.reflection.exception.FieldNotFoundError;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static rk.tools.objectxpath.Commons.arrayListOf;
 import static rk.tools.objectxpath.Commons.transformList;
 import static rk.utils.reflection.ReflectionUtils.*;
 
 public class XXPath {
 
-    static final Logger logger = Logger.getAnonymousLogger();
+    private static final Logger logger = Logger.getAnonymousLogger();
 
-    static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
+    private static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
             XPathNodeType.ROOT,
+            XPathNodeType.PARENT,
             XPathNodeType.ANY_WITH_ATTRIBUTE,
             XPathNodeType.ANY_WITH_INDEX,
             XPathNodeType.WITH_ATTRIBUTE,
@@ -90,11 +91,6 @@ public class XXPath {
         return nodes;
     }
 
-    //todo map support
-    //todo support any node - * (previous item must be implemented)
-    //todo support parent navigation /..
-    //todo collection with null items
-
     private boolean nodeHasAttribute(Node node, String attrName, Object attrValue) {
         return node.value != null && getFieldValue(attrName, node.value)
                 .filter(attr -> Objects.equals(attrValue, attr)).isPresent();
@@ -123,9 +119,9 @@ public class XXPath {
                 break;
             }
             for (Node node : Lists.removeAll(nodes)) {
-                List<Node> descendants = findNextNode(node, xPathNode);
-                if (descendants.size() == 1) {
-                    node = descendants.get(0);
+                List<Node> foundNodes = findNextNode(node, xPathNode);
+                if (foundNodes.size() == 1) {
+                    node = foundNodes.get(0);
                     if (xPathNodeWithIndex(xPathNode)) { //one node returned, pick a child with index
                         int index = ((NodeWithIndex) xPathNode).index - 1;
                         Optional<Node> child = getNodeWithIndex(node.children, index);
@@ -146,7 +142,7 @@ public class XXPath {
                 } else {
                     if (xPathNodeWithIndex(xPathNode)) { //multiple nodes returned, pick a node with index
                         int index = ((NodeWithIndex) xPathNode).index - 1;
-                        Optional<Node> _node = getNodeWithIndex(descendants, index);
+                        Optional<Node> _node = getNodeWithIndex(foundNodes, index);
                         if (_node.isPresent()) {
                             nodes.add(_node.get());
                             if (lastXpathNode) {
@@ -155,7 +151,7 @@ public class XXPath {
                         }
                         continue;
                     }
-                    descendants.forEach(_node -> {
+                    foundNodes.forEach(_node -> {
                         if (nodeMatchesXpathNode(_node, xPathNode)) {
                             nodes.add(_node);
                             if (lastXpathNode) {
@@ -230,6 +226,9 @@ public class XXPath {
     }
 
     private List<Node> findNextNode(Node parent, XPathNode xPathNode) {
+        if (xPathNode.type == XPathNodeType.PARENT) {
+            return parent.parent == null ? emptyList() : arrayListOf(parent.parent);
+        }
         if (xPathNode.type == XPathNodeType.ATTRIBUTE) {
             return findAttributeNode(parent, xPathNode);
         }
@@ -301,7 +300,7 @@ public class XXPath {
             //todo map key type (string or number)
             Map map = (Map) value;
             //todo do not use stream here for performance reasons? (iterator instead)
-            map.keySet().stream().findFirst().ifPresent(key->{
+            map.keySet().stream().findFirst().ifPresent(key -> {
                 if (isPrimitive(key)) {
                     map.entrySet().forEach(entry -> {
                         Map.Entry<Comparable, Object> _entry = (Map.Entry<Comparable, Object>) entry;
@@ -315,8 +314,9 @@ public class XXPath {
             Collection collection = (Collection) value;
             int i = 1;
             for (Object item : collection) {
-                //todo add null support here
-                node.children.add(toNode(node, item, getNameFor(item), i++));
+                if (item != null) {
+                    node.children.add(toNode(node, item, getNameFor(item), i++));
+                }
             }
             return node;
         }
@@ -330,10 +330,10 @@ public class XXPath {
             }
             return false;
         });
-        node.attributes = transformList(attributes, field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
-                field.getName(), null));
-        node.children = transformList(fields, field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
-                field.getName(), null));
+        node.attributes = transformList(attributes, field
+                -> toNode(node, ReflectionUtils.getFieldValue(field, value), field.getName(), null));
+        node.children = transformList(fields, field
+                -> toNode(node, ReflectionUtils.getFieldValue(field, value), field.getName(), null));
         return node;
     }
 
@@ -349,11 +349,17 @@ public class XXPath {
         return type.isPrimitive() || primitiveTypes.contains(type);
     }
 
+    /**
+     * Gets a name for an object based on it's class name.
+     */
     private String getNameFor(Object object) {
         String name = object.getClass().getSimpleName();
         return name.substring(0, 1).toLowerCase() + name.substring(1);
     }
 
+    /**
+     * Converts some object to a string.
+     */
     private String string(Object object) {
         return object == null ? null : String.valueOf(object);
     }

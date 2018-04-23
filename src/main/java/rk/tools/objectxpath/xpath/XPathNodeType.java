@@ -9,6 +9,18 @@ import java.util.regex.Pattern;
  * Represents different XPath node types.
  */
 public enum XPathNodeType {
+    PARENT("/(\\.\\.)",""){
+        @Override
+        public XPathNode create(Matcher matcher) {
+            return new XPathNode(
+                    PARENT,
+                    nodeRelationship(matcher),
+                    nodeName(matcher),
+                    nodeStartIndex(matcher),
+                    nodeEndIndex(matcher)
+            );
+        }
+    },
     ANY("/(\\*)", "//(\\*)") {
         @Override
         public XPathNode create(Matcher matcher) {

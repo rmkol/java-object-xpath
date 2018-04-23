@@ -41,6 +41,7 @@ class XPathTest {
             gear1.characteristics = new ArrayList<>();
             gear1.characteristics.add(new Characteristic("11", "model:1"));
             gear1.characteristics.add(new Characteristic("22", "size:1"));
+            gear1.characteristics.add(null);
 
             Gear gear2 = new Gear();
             gear2.name = "gear_2";
@@ -208,15 +209,28 @@ class XPathTest {
             assertNull(result);
         }
 
-        // //Characteristic[@details='size:1']/../..
+        //.. parent node
+        {
+            result = processXpath("/gears/..");
+            assertEquals(sedan, result);
+
+            result = processXpath("/gears/../gears");
+            assertEquals(sedan.getGears(), result);
+
+            result = processXpath("/..");
+            assertNull(result);
+
+            result = processXpath("//*[@id='22']/../..");
+            assertEquals(sedan.getGears().get(0), result);
+        }
     }
 
     @Test
     void testOne() {
         List list;
         Object result;
-        result = processXpath("/details/d1");
-        assertEquals(sedan.details.get("d1"), result);
+        result = processXpath("/gears/..");
+        assertEquals(sedan, result);
     }
 
     Object processXpath(String xPath) {
@@ -228,6 +242,7 @@ class XPathTest {
     //todo empty with complex key
     //todo map of map? :O
     //todo map with weird keys
+    //todo map with number key
 
     void checkInvalidXpath(String xPath) {
         try {
