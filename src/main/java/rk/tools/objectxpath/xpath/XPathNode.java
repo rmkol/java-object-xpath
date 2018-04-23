@@ -1,7 +1,5 @@
 package rk.tools.objectxpath.xpath;
 
-import rk.tools.objectxpath.NodeRelationship;
-
 public class XPathNode {
     public XPathNodeType type;
     public NodeRelationship relationship;

@@ -5,4 +5,5 @@ import java.util.Map;
 public class Sedan extends Vehicle {
     public double trunkSize;
     public Map<String,String> details;
+    public Map<Integer,String> materials;
 }

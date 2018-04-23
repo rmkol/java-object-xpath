@@ -1,7 +1,5 @@
 package rk.tools.objectxpath.xpath;
 
-import rk.tools.objectxpath.NodeRelationship;
-
 public class NodeWithAttribute extends XPathNode {
     public String attrName;
     public Object attrValue;

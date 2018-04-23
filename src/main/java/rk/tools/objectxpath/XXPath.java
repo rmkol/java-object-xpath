@@ -4,10 +4,7 @@
 package rk.tools.objectxpath;
 
 import rk.tools.objectxpath.exception.InvalidXPathExpressionError;
-import rk.tools.objectxpath.xpath.NodeWithAttribute;
-import rk.tools.objectxpath.xpath.NodeWithIndex;
-import rk.tools.objectxpath.xpath.XPathNode;
-import rk.tools.objectxpath.xpath.XPathNodeType;
+import rk.tools.objectxpath.xpath.*;
 import rk.utils.reflection.ReflectionUtils;
 import rk.utils.reflection.exception.FieldNotFoundError;
 
@@ -15,18 +12,15 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static rk.tools.objectxpath.Commons.arrayListOf;
-import static rk.tools.objectxpath.Commons.transformList;
+import static rk.tools.objectxpath.Lists.arrayListOf;
+import static rk.tools.objectxpath.Lists.transformList;
 import static rk.utils.reflection.ReflectionUtils.*;
 
 public class XXPath {
-
-    private static final Logger logger = Logger.getAnonymousLogger();
 
     private static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
             XPathNodeType.ROOT,
@@ -107,6 +101,9 @@ public class XXPath {
     }
 
     public Object process(String xPath, Object object) {
+        if (object == null) {
+            throw new IllegalArgumentException("object cannot be null");
+        }
         checkXpathExpression(xPath);
         List<XPathNode> xPathNodes = parseXPath(xPath);
         List<Node> nodes = arrayListOf(objectToTree(object));
@@ -263,29 +260,22 @@ public class XXPath {
         root.name = getNameFor(object);
         root.value = object;
         root.path = "/" + root.name;
-        if (isPrimitive(object) || isMap(object) || isCollection(object)) {
+        if (isPrimitive(object)) {
             return root;
         }
-
-        List<Field> fields = getAllFieldsOf(object);
-        List<Field> attributes = arrayListOf();
-        fields.removeIf(field -> {
-            if (isPrimitive(field)) {
-                attributes.add(field);
-                return true;
-            }
-            return false;
-        });
-        root.attributes = transformList(attributes, field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
-                field.getName(), null));
-        root.children = transformList(fields, field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
-                field.getName(), null));
+        if (isMap(object)) {
+            processMapNode(root);
+            return root;
+        }
+        if (isCollection(object)) {
+            processCollectionNode(root);
+            return root;
+        }
+        processNodeFields(getAllFieldsOf(object), root);
         return root;
     }
 
     private Node toNode(Node parent, Object value, String name, Integer index) {
-        logger.info("processing node " + name + " with parent " + parent);
-
         Node node = new Node();
         node.name = name;
         node.value = value;
@@ -297,31 +287,42 @@ public class XXPath {
             return node;
         }
         if (isMap(value)) {
-            //todo map key type (string or number)
-            Map map = (Map) value;
-            //todo do not use stream here for performance reasons? (iterator instead)
-            map.keySet().stream().findFirst().ifPresent(key -> {
-                if (isPrimitive(key)) {
-                    map.entrySet().forEach(entry -> {
-                        Map.Entry<Comparable, Object> _entry = (Map.Entry<Comparable, Object>) entry;
-                        node.children.add(toNode(node, _entry.getValue(), string(_entry.getKey()), null));
-                    });
-                }
-            });
+            processMapNode(node);
             return node;
         }
         if (isCollection(value)) {
-            Collection collection = (Collection) value;
-            int i = 1;
-            for (Object item : collection) {
-                if (item != null) {
-                    node.children.add(toNode(node, item, getNameFor(item), i++));
-                }
-            }
+            processCollectionNode(node);
             return node;
         }
+        processNodeFields(getAllFieldsOf(value.getClass()), node);
+        return node;
+    }
 
-        List<Field> fields = getAllFieldsOf(value.getClass());
+    private void processCollectionNode(Node node) {
+        Collection collection = (Collection) node.value;
+        int i = 1;
+        for (Object item : collection) {
+            if (item != null) {
+                node.children.add(toNode(node, item, getNameFor(item), i++));
+            }
+        }
+    }
+
+    private void processMapNode(Node node) {
+        //todo map key type (string or number)
+        Map map = (Map) node.value;
+        //todo do not use stream here for performance reasons? (iterator instead)
+        map.keySet().stream().findFirst().ifPresent(key -> {
+            if (isPrimitive(key)) {
+                map.entrySet().forEach(entry -> {
+                    Map.Entry<Comparable, Object> _entry = (Map.Entry<Comparable, Object>) entry;
+                    node.children.add(toNode(node, _entry.getValue(), string(_entry.getKey()), null));
+                });
+            }
+        });
+    }
+
+    private void processNodeFields(List<Field> fields, Node node) {
         List<Field> attributes = arrayListOf();
         fields.removeIf(field -> {
             if (isPrimitive(field)) {
@@ -331,10 +332,9 @@ public class XXPath {
             return false;
         });
         node.attributes = transformList(attributes, field
-                -> toNode(node, ReflectionUtils.getFieldValue(field, value), field.getName(), null));
+                -> toNode(node, ReflectionUtils.getFieldValue(field, node.value), field.getName(), null));
         node.children = transformList(fields, field
-                -> toNode(node, ReflectionUtils.getFieldValue(field, value), field.getName(), null));
-        return node;
+                -> toNode(node, ReflectionUtils.getFieldValue(field, node.value), field.getName(), null));
     }
 
     //TODO allow to customize primitive types

@@ -6,21 +6,22 @@ import rk.tools.objectxpath.object.Characteristic;
 import rk.tools.objectxpath.object.Engine;
 import rk.tools.objectxpath.object.Gear;
 import rk.tools.objectxpath.object.Sedan;
-import rk.tools.xmlprinter.XML;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static rk.tools.objectxpath.Commons.arrayListOf;
-import static rk.tools.objectxpath.Commons.print;
+import static org.junit.jupiter.api.Assertions.*;
+import static rk.tools.objectxpath.Lists.arrayListOf;
 
+@SuppressWarnings("unchecked")
 class XPathTest {
     XXPath xxPath = new XXPath();
     Sedan sedan;
+
+    Object result;
+    List list;
 
     {
         sedan = new Sedan();
@@ -90,16 +91,80 @@ class XPathTest {
         }
     }
 
+    //todo map of map? :O
+    //todo map with weird keys
+    //todo map with number key
+    //todo collection as root
+
     @Test
-    void xml() {
-        print(new XML().toXml("sedan", sedan));
+    void listAsRoot() {
+        List<String> list = arrayListOf("h1", "h2");
+        this.result = xxPath.process("/", list);
+        assertEquals(list, result);
+        this.list = (List) xxPath.process("/*", list);
+        assertEquals(2, this.list.size());
+        assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
+        assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
+        this.list = (List) xxPath.process("//*", list);
+        assertEquals(2, this.list.size());
+        assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
+        assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
+    }
+
+    @Test
+    void primitiveAsRoot() {
+        result = xxPath.process("/", 25);
+        assertEquals(25, result);
+        result = xxPath.process("/", "25");
+        assertEquals("25", result);
+        result = xxPath.process("/", 22.6);
+        assertEquals(22.6, result);
+        result = xxPath.process("/value", 25);
+        assertNull(result);
+        result = xxPath.process("/*", 25);
+        assertNull(result);
+    }
+
+    @Test
+    void mapAsRoot() {
+        Map<String, String> map = new HashMap<>();
+        map.put("record-11", "details-11");
+        map.put("record-12", "details-12");
+        result = xxPath.process("/record-11", map);
+        assertEquals("details-11", result);
+        result = xxPath.process("/record-12", map);
+        assertEquals("details-12", result);
+        list = (List) xxPath.process("/*", map);
+        assertEquals(2, list.size());
+        assertTrue(list.stream().anyMatch(item -> item.equals("details-11")));
+        assertTrue(list.stream().anyMatch(item -> item.equals("details-12")));
+        list = (List) xxPath.process("//*", map);
+        assertEquals(2, list.size());
+        assertTrue(list.stream().anyMatch(item -> item.equals("details-11")));
+        assertTrue(list.stream().anyMatch(item -> item.equals("details-12")));
+    }
+
+    @Test
+    void mapWithComplexStringKeys() {
+        sedan.details.put("detail-21", "details");
+        result = xxPath.process("/details/detail-21", sedan);
+        assertEquals("details", result);
+        result = xxPath.process("/details/d1", sedan);
+        assertEquals(sedan.details.get("d1"), result);
+        sedan.details.clear();
+        result = xxPath.process("/details/detail-21", sedan);
+        assertNull(result);
+    }
+
+    @Test
+    void emptyMap() {
+        sedan.details.clear();
+        result = xxPath.process("/details/detail1", sedan);
+        assertNull(result);
     }
 
     @Test
     void process() {
-        Object result;
-        List list;
-
         result = processXpath("//engine/@volume");
         assertEquals(2.0D, result);
 
@@ -226,23 +291,13 @@ class XPathTest {
     }
 
     @Test
-    void testOne() {
-        List list;
-        Object result;
-        result = processXpath("/gears/..");
-        assertEquals(sedan, result);
+    void nullObject() {
+        assertThrows(IllegalArgumentException.class, () -> xxPath.process("/", null));
     }
 
     Object processXpath(String xPath) {
         return xxPath.process(xPath, sedan);
     }
-
-    //todo empty map
-    //todo map with complex key
-    //todo empty with complex key
-    //todo map of map? :O
-    //todo map with weird keys
-    //todo map with number key
 
     void checkInvalidXpath(String xPath) {
         try {
@@ -255,98 +310,9 @@ class XPathTest {
 
     @Test
     void processNegative() {
-        // /engine[1]
-        // /engine//characteristics[1]
-        // /engine//characteristics[@name='nn']
+        assertThrows(NullPointerException.class, () -> checkInvalidXpath(null));
         checkInvalidXpath("/engine/");
         checkInvalidXpath("///");
         checkInvalidXpath("/[]");
     }
-
-    //    @Test
-//    @SuppressWarnings("unchecked")
-//    void getNextNode() {
-//        {
-//            String xpath = "//engine/@volume";
-//            Optional<XPathNode> node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            XPathNode node = node_.get();
-//            assertEquals("engine", node.name);
-//            assertEquals(NodeRelationship.DESCENDANT, node.relationship);
-//            assertEquals(1, node.startIndex);
-//            assertEquals(8, node.endIndex);
-//
-//            xpath = "/engine/@volume";
-//            node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            node = node_.get();
-//            assertEquals("engine", node.name);
-//            assertEquals(NodeRelationship.CHILD, node.relationship);
-//            assertEquals(0, node.startIndex);
-//            assertEquals(7, node.endIndex);
-//        }
-//
-//        //with index
-//        {
-//            String xpath = "/gears[1]/@name";
-//            Optional<XPathNode> node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            NodeWithIndex node = (NodeWithIndex) node_.get();
-//            assertEquals("gears", node.name);
-//            assertEquals(NodeRelationship.CHILD, node.relationship);
-//            assertEquals(0, node.startIndex);
-//            assertEquals(9, node.endIndex);
-//            assertEquals(1, node.index);
-//
-//            xpath = "//gears[1]/@name";
-//            node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            node = (NodeWithIndex) node_.get();
-//            assertEquals("gears", node.name);
-//            assertEquals(NodeRelationship.DESCENDANT, node.relationship);
-//            assertEquals(1, node.startIndex);
-//            assertEquals(10, node.endIndex);
-//            assertEquals(1, node.index);
-//        }
-//
-//        //with attribute
-//        {
-//            String xpath = "/gears[@name='gear1']";
-//            Optional<XPathNode> node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            NodeWithAttribute node = (NodeWithAttribute) node_.get();
-//            assertEquals("gears", node.name);
-//            assertEquals(NodeRelationship.CHILD, node.relationship);
-//            assertEquals(0, node.startIndex);
-//            assertEquals(21, node.endIndex);
-//            assertEquals("name", node.attrName);
-//            assertEquals("gear1", node.attrValue);
-//
-//            xpath = "//gears[@name='gear1']";
-//            node_ = xPath.findNextXPathNode(xpath);
-//            assertTrue(node_.isPresent());
-//            node = (NodeWithAttribute) node_.get();
-//            assertEquals("gears", node.name);
-//            assertEquals(NodeRelationship.DESCENDANT, node.relationship);
-//            assertEquals(1, node.startIndex);
-//            assertEquals(22, node.endIndex);
-//            assertEquals("name", node.attrName);
-//            assertEquals("gear1", node.attrValue);
-//        }
-//    }
-
-//    @Test
-//    void parseXPath() {
-//        String xpath = "//engine/@volume";
-//        List<XPathNode> nodes = xPath.parseXPath(xpath);
-//        assertEquals(2, nodes.size());
-//
-//        XPathNode first = nodes.get(0);
-//        assertEquals("engine", first.name);
-//        assertEquals(NodeRelationship.DESCENDANT, first.relationship);
-//
-//        AttributeNode second = (AttributeNode) nodes.get(1);
-//        assertEquals("volume", second.name);
-//        assertEquals(NodeRelationship.CHILD, second.relationship);
-//    }
 }
