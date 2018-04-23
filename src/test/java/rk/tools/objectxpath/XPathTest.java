@@ -174,8 +174,29 @@ class XPathTest {
             assertEquals(sedan.engine.gears.get(0).characteristics.get(2), list.get(6));
         }
 
+        //any node *
+        {
+            list = (List) xxPath.process("/*", sedan);
+            assertEquals(4, list.size());
+            assertEquals(sedan.details, list.get(0));
+            assertEquals(sedan.getGears(), list.get(1));
+            assertEquals(sedan.countryCodes, list.get(2));
+            assertEquals(sedan.engine, list.get(3));
+
+            list = (List) xxPath.process("//*", sedan);
+            assertEquals(25, list.size());
+
+            result = xxPath.process("//*[@details='sn:22']", sedan);
+            assertEquals(sedan.engine.gears.get(0).characteristics.get(1), result);
+        }
+
         // //Characteristic[@details='size:1']/../..
     }
+
+    //todo empty map
+    //todo map with complex key
+    //todo empty with complex key
+    //todo map of map? :O
 
     void checkInvalidXpath(String xPath) {
         try {
@@ -183,7 +204,7 @@ class XPathTest {
         } catch (InvalidXPathExpressionError e) {
             return;
         }
-        throw new AssertionError(xPath + " was treated like valid");
+        throw new AssertionError(xPath + " was treated like valid XPath expression");
     }
 
     @Test

@@ -7,11 +7,14 @@ import rk.tools.objectxpath.exception.InvalidXPathExpressionError;
 import rk.tools.objectxpath.xpath.NodeWithAttribute;
 import rk.tools.objectxpath.xpath.NodeWithIndex;
 import rk.tools.objectxpath.xpath.XPathNode;
+import rk.tools.objectxpath.xpath.XPathNodeType;
 import rk.utils.reflection.ReflectionUtils;
 import rk.utils.reflection.exception.FieldNotFoundError;
 
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -25,12 +28,15 @@ public class XXPath {
 
     static final Logger logger = Logger.getAnonymousLogger();
 
-    static final List<NodeType> NODE_TYPES = arrayListOf(
-            NodeType.ROOT,
-            NodeType.WITH_ATTRIBUTE,
-            NodeType.WITH_INDEX,
-            NodeType.SIMPLE,
-            NodeType.ATTRIBUTE
+    static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
+            XPathNodeType.ROOT,
+            XPathNodeType.ANY_WITH_ATTRIBUTE,
+            XPathNodeType.ANY_WITH_INDEX,
+            XPathNodeType.WITH_ATTRIBUTE,
+            XPathNodeType.WITH_INDEX,
+            XPathNodeType.ANY,
+            XPathNodeType.SIMPLE,
+            XPathNodeType.ATTRIBUTE
     );
 
     /**
@@ -57,7 +63,7 @@ public class XXPath {
      * @return {@link Optional} of {@link XPathNode}
      */
     private Optional<XPathNode> findNextXPathNode(String xPath) {
-        for (NodeType nodeType : NODE_TYPES) {
+        for (XPathNodeType nodeType : NODE_TYPES) {
             Matcher matcher = nodeType.patternChild.matcher(xPath);
             if (nodeType.matches(matcher)) {
                 return Optional.of(nodeType.create(matcher));
@@ -84,16 +90,14 @@ public class XXPath {
         return nodes;
     }
 
-    //todo collect multiple results of //
+    //todo map support
     //todo support any node - * (previous item must be implemented)
     //todo support parent navigation /..
     //todo collection with null items
-    //todo map support
 
     private boolean nodeHasAttribute(Node node, String attrName, Object attrValue) {
-        Optional<String> value = getFieldValue(attrName, node.value);
-        //todo allow custom type comparator?
-        return value.filter(s -> Objects.equals(attrValue, s)).isPresent();
+        return node.value != null && getFieldValue(attrName, node.value)
+                .filter(attr -> Objects.equals(attrValue, attr)).isPresent();
     }
 
     private Optional<Node> getNodeWithIndex(List<Node> nodes, int index) {
@@ -114,7 +118,7 @@ public class XXPath {
         while (xPathNodes.size() > 0) {
             XPathNode xPathNode = xPathNodes.remove(0);
             boolean lastXpathNode = xPathNodes.isEmpty();
-            if (xPathNode.type == NodeType.ROOT) {
+            if (xPathNode.type == XPathNodeType.ROOT) {
                 result.add(nodes.get(0));
                 break;
             }
@@ -122,7 +126,7 @@ public class XXPath {
                 List<Node> descendants = findNextNode(node, xPathNode);
                 if (descendants.size() == 1) {
                     node = descendants.get(0);
-                    if (xPathNode.type == NodeType.WITH_INDEX) { //one node returned, pick a child with index
+                    if (xPathNodeWithIndex(xPathNode)) { //one node returned, pick a child with index
                         int index = ((NodeWithIndex) xPathNode).index - 1;
                         Optional<Node> child = getNodeWithIndex(node.children, index);
                         if (child.isPresent()) {
@@ -140,7 +144,7 @@ public class XXPath {
                         }
                     }
                 } else {
-                    if (xPathNode.type == NodeType.WITH_INDEX) { //multiple nodes returned, pick a node with index
+                    if (xPathNodeWithIndex(xPathNode)) { //multiple nodes returned, pick a node with index
                         int index = ((NodeWithIndex) xPathNode).index - 1;
                         Optional<Node> _node = getNodeWithIndex(descendants, index);
                         if (_node.isPresent()) {
@@ -174,8 +178,19 @@ public class XXPath {
                 .collect(Collectors.toList());
     }
 
+    private boolean xPathNodeWithIndex(XPathNode xPathNode) {
+        return xPathNode.type == XPathNodeType.ANY_WITH_INDEX
+                || xPathNode.type == XPathNodeType.WITH_INDEX;
+    }
+
+    private boolean xPathNodeWithAttribute(XPathNode xPathNode) {
+        return xPathNode.type == XPathNodeType.ANY_WITH_ATTRIBUTE
+                || xPathNode.type == XPathNodeType.WITH_ATTRIBUTE;
+    }
+
+    //todo rename
     private boolean nodeMatchesXpathNode(Node node, XPathNode xPathNode) {
-        if (xPathNode.type == NodeType.WITH_ATTRIBUTE) {
+        if (xPathNodeWithAttribute(xPathNode)) {
             return nodeHasAttribute(node, ((NodeWithAttribute) xPathNode).attrName,
                     ((NodeWithAttribute) xPathNode).attrValue);
         }
@@ -201,26 +216,28 @@ public class XXPath {
 
     private List<Node> findAttributeNode(Node node, XPathNode xPathNode) {
         List<Node> nodes = arrayListOf();
-        for (Node attr : node.children) {
+        for (Node attr : node.attributes) {
             if (attr.name.equals(xPathNode.name)) {
                 nodes.add(attr);
             }
-            if (xPathNode.relationship == NodeRelationship.DESCENDANT) {
-                attr.children.forEach(child -> {
-                    nodes.addAll(findAttributeNode(child, xPathNode));
-                });
-            }
+        }
+        if (xPathNode.relationship == NodeRelationship.DESCENDANT) {
+            node.children.forEach(child -> {
+                nodes.addAll(findAttributeNode(child, xPathNode));
+            });
         }
         return nodes;
     }
 
     private List<Node> findNextNode(Node parent, XPathNode xPathNode) {
-        if (xPathNode.type == NodeType.ATTRIBUTE) {
+        if (xPathNode.type == XPathNodeType.ATTRIBUTE) {
             return findAttributeNode(parent, xPathNode);
         }
         List<Node> nodes = arrayListOf();
         for (Node child : parent.children) {
-            if (child.name.equals(xPathNode.name)) {
+            if (anyXpathNode(xPathNode)) {
+                nodes.add(child);
+            } else if (child.name.equals(xPathNode.name)) {
                 nodes.add(child);
             }
             if (xPathNode.relationship == NodeRelationship.DESCENDANT) { //todo check for primitive node
@@ -228,6 +245,12 @@ public class XXPath {
             }
         }
         return nodes;
+    }
+
+    private boolean anyXpathNode(XPathNode xPathNode) {
+        return xPathNode.type == XPathNodeType.ANY_WITH_ATTRIBUTE
+                || xPathNode.type == XPathNodeType.ANY_WITH_INDEX
+                || xPathNode.type == XPathNodeType.ANY;
     }
 
     /**
@@ -244,9 +267,20 @@ public class XXPath {
         if (isPrimitive(object) || isMap(object) || isCollection(object)) {
             return root;
         }
-        root.children = transformList(getAllFieldsOf(object),
-                field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
-                        field.getName(), null));
+
+        List<Field> fields = getAllFieldsOf(object);
+        List<Field> attributes = arrayListOf();
+        fields.removeIf(field -> {
+            if (isPrimitive(field)) {
+                attributes.add(field);
+                return true;
+            }
+            return false;
+        });
+        root.attributes = transformList(attributes, field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
+                field.getName(), null));
+        root.children = transformList(fields, field -> toNode(root, ReflectionUtils.getFieldValue(field, object),
+                field.getName(), null));
         return root;
     }
 
@@ -264,23 +298,49 @@ public class XXPath {
             return node;
         }
         if (isMap(value)) {
-            return node; //todo populate children somehow
+            //todo map key type (string or number)
+            Map map = (Map) value;
+            //todo do not use stream here for performance reasons? (iterator instead)
+            map.keySet().stream().findFirst().ifPresent(key->{
+                if (isPrimitive(key)) {
+                    map.entrySet().forEach(entry -> {
+                        Map.Entry<Comparable, Object> _entry = (Map.Entry<Comparable, Object>) entry;
+                        node.children.add(toNode(node, _entry.getValue(), string(_entry.getKey()), null));
+                    });
+                }
+            });
+            return node;
         }
         if (isCollection(value)) {
             Collection collection = (Collection) value;
-            Iterator iterator = collection.iterator();
             int i = 1;
-            while (iterator.hasNext()) {
-                Object item = iterator.next();
+            for (Object item : collection) {
                 //todo add null support here
                 node.children.add(toNode(node, item, getNameFor(item), i++));
             }
             return node;
         }
-        node.children = transformList(getAllFieldsOf(value.getClass()),
-                field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
-                        field.getName(), null));
+
+        List<Field> fields = getAllFieldsOf(value.getClass());
+        List<Field> attributes = arrayListOf();
+        fields.removeIf(field -> {
+            if (isPrimitive(field)) {
+                attributes.add(field);
+                return true;
+            }
+            return false;
+        });
+        node.attributes = transformList(attributes, field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
+                field.getName(), null));
+        node.children = transformList(fields, field -> toNode(node, ReflectionUtils.getFieldValue(field, value),
+                field.getName(), null));
         return node;
+    }
+
+    //TODO allow to customize primitive types
+    private static boolean isPrimitive(Field field) {
+        Class type = field.getType();
+        return type.isPrimitive() || primitiveTypes.contains(type);
     }
 
     //TODO allow to customize primitive types
@@ -306,6 +366,7 @@ public class XXPath {
         String name;
         String path;
         Object value;
+        List<Node> attributes = arrayListOf();
         List<Node> children = arrayListOf();
 
         @Override

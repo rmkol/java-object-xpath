@@ -1,9 +1,6 @@
-package rk.tools.objectxpath;
+package rk.tools.objectxpath.xpath;
 
-import rk.tools.objectxpath.xpath.AttributeNode;
-import rk.tools.objectxpath.xpath.XPathNode;
-import rk.tools.objectxpath.xpath.NodeWithAttribute;
-import rk.tools.objectxpath.xpath.NodeWithIndex;
+import rk.tools.objectxpath.NodeRelationship;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -11,7 +8,57 @@ import java.util.regex.Pattern;
 /**
  * Represents different XPath node types.
  */
-public enum NodeType {
+public enum XPathNodeType {
+    ANY("/(\\*)", "//(\\*)") {
+        @Override
+        public XPathNode create(Matcher matcher) {
+            return new XPathNode(
+                    ANY,
+                    nodeRelationship(matcher),
+                    nodeName(matcher),
+                    nodeStartIndex(matcher),
+                    nodeEndIndex(matcher)
+            );
+        }
+    },
+    /**
+     * Any node identified by name and index.
+     * <p>'/*[2]'</p>
+     */
+    ANY_WITH_INDEX("/(\\*)\\[([0-9]+)]", "//(\\*)\\[([0-9]+)]") {
+        @Override
+        public XPathNode create(Matcher matcher) {
+            int nodeIndex = Integer.parseInt(matcher.group(2));
+            return new NodeWithIndex(
+                    ANY_WITH_INDEX,
+                    nodeRelationship(matcher),
+                    nodeName(matcher),
+                    nodeStartIndex(matcher),
+                    nodeEndIndex(matcher),
+                    nodeIndex
+            );
+        }
+    },
+    /**
+     * Any node identified by name and some attribute's value.
+     * <p>'/*[@model='m1']'</p>
+     */
+    ANY_WITH_ATTRIBUTE("/(\\*)\\[@(.*)='(.*)']", "//(\\*)\\[@(.*)='(.*)']") {
+        @Override
+        public XPathNode create(Matcher matcher) {
+            String attr = matcher.group(2);
+            Object attrValue = matcher.group(3);
+            return new NodeWithAttribute(
+                    ANY_WITH_ATTRIBUTE,
+                    nodeRelationship(matcher),
+                    nodeName(matcher),
+                    nodeStartIndex(matcher),
+                    nodeEndIndex(matcher),
+                    attr,
+                    attrValue
+            );
+        }
+    },
     ROOT("(^/$)", "") {
         @Override
         public XPathNode create(Matcher matcher) {
@@ -49,6 +96,7 @@ public enum NodeType {
         public XPathNode create(Matcher matcher) {
             int nodeIndex = Integer.parseInt(matcher.group(2));
             return new NodeWithIndex(
+                    WITH_INDEX,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -67,6 +115,7 @@ public enum NodeType {
             String attr = matcher.group(2);
             Object attrValue = matcher.group(3);
             return new NodeWithAttribute(
+                    WITH_ATTRIBUTE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -95,7 +144,7 @@ public enum NodeType {
     public final Pattern patternChild;
     public final Pattern patternDescendant;
 
-    NodeType(String patternChild, String patternDescendant) {
+    XPathNodeType(String patternChild, String patternDescendant) {
         this.patternChild = Pattern.compile(patternChild);
         this.patternDescendant = Pattern.compile(patternDescendant);
     }
