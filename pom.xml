@@ -22,13 +22,6 @@
     </build>
 
     <dependencies>
-        <!-- TEST -->
-        <dependency>
-            <groupId>rk.tools</groupId>
-            <artifactId>xml-printer</artifactId>
-            <version>0.1</version>
-        </dependency>
-        <!-- /TEST -->
         <dependency>
             <groupId>rk.utils</groupId>
             <artifactId>reflection-utils</artifactId>
