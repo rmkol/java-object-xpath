@@ -7,11 +7,11 @@ import java.util.regex.Pattern;
  * Represents different XPath node types.
  */
 public enum XPathNodeType {
-    PARENT("/(\\.\\.)") {
+    PARENT_NODE("/(\\.\\.)") {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
-                    PARENT,
+                    PARENT_NODE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -19,11 +19,11 @@ public enum XPathNodeType {
             );
         }
     },
-    ANY("/(\\*)") {
+    ANY_NODE("/(\\*)") {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
-                    ANY,
+                    ANY_NODE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -35,12 +35,12 @@ public enum XPathNodeType {
      * Any node identified by name and index.
      * <p>'/*[2]'</p>
      */
-    ANY_WITH_INDEX("/(\\*)\\[([0-9]+)]") {
+    ANY_NODE_WITH_INDEX("/(\\*)\\[([0-9]+)]") {
         @Override
         public XPathNode create(Matcher matcher) {
             int nodeIndex = Integer.parseInt(matcher.group(2));
             return new NodeWithIndex(
-                    ANY_WITH_INDEX,
+                    ANY_NODE_WITH_INDEX,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -53,13 +53,13 @@ public enum XPathNodeType {
      * Any node identified by name and some attribute's value.
      * <p>'/*[@model='m1']'</p>
      */
-    ANY_WITH_ATTRIBUTE("/(\\*)\\[@(.*)='(.*)']") {
+    ANY_NODE_WITH_ATTRIBUTE("/(\\*)\\[@(.*)='(.*)']") {
         @Override
         public XPathNode create(Matcher matcher) {
             String attr = matcher.group(2);
             Object attrValue = matcher.group(3);
             return new NodeWithAttribute(
-                    ANY_WITH_ATTRIBUTE,
+                    ANY_NODE_WITH_ATTRIBUTE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -69,11 +69,11 @@ public enum XPathNodeType {
             );
         }
     },
-    ROOT("(^/$)") {
+    ROOT_NODE("(^/$)") {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
-                    ROOT,
+                    ROOT_NODE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -85,11 +85,11 @@ public enum XPathNodeType {
      * Simple node which is identified only by name.
      * <p>'/car'</p>
      */
-    SIMPLE("/([a-zA-Z0-9_-]+)") {
+    SIMPLE_NODE("/([a-zA-Z0-9_-]+)") {
         @Override
         public XPathNode create(Matcher matcher) {
             return new XPathNode(
-                    SIMPLE,
+                    SIMPLE_NODE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -101,12 +101,12 @@ public enum XPathNodeType {
      * A node which is identified by name and index.
      * <p>'/car[2]'</p>
      */
-    WITH_INDEX("/([a-zA-Z0-9_-]+)\\[([0-9]+)]") {
+    NODE_WITH_INDEX("/([a-zA-Z0-9_-]+)\\[([0-9]+)]") {
         @Override
         public XPathNode create(Matcher matcher) {
             int nodeIndex = Integer.parseInt(matcher.group(2));
             return new NodeWithIndex(
-                    WITH_INDEX,
+                    NODE_WITH_INDEX,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -119,13 +119,13 @@ public enum XPathNodeType {
      * A node which is identified by name and some attribute's value.
      * <p>'/car[@model='m1']'</p>
      */
-    WITH_ATTRIBUTE("/([a-zA-Z0-9_-]+)\\[@(.*)='(.*)']") {
+    NODE_WITH_ATTRIBUTE("/([a-zA-Z0-9_-]+)\\[@(.*)='(.*)']") {
         @Override
         public XPathNode create(Matcher matcher) {
             String attr = matcher.group(2);
             Object attrValue = matcher.group(3);
             return new NodeWithAttribute(
-                    WITH_ATTRIBUTE,
+                    NODE_WITH_ATTRIBUTE,
                     nodeRelationship(matcher),
                     nodeName(matcher),
                     nodeStartIndex(matcher),
@@ -139,7 +139,7 @@ public enum XPathNodeType {
      * Attribute node.
      * <p>'/car/@model'</p>
      */
-    ATTRIBUTE("/@([a-zA-Z0-9_-]+)") {
+    NODE_ATTRIBUTE("/@([a-zA-Z0-9_-]+)") {
         @Override
         public XPathNode create(Matcher matcher) {
             String attribute = matcher.group(1);

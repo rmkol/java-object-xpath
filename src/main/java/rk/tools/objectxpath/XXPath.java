@@ -18,20 +18,21 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static rk.tools.objectxpath.Lists.arrayListOf;
 import static rk.tools.objectxpath.Lists.transformList;
+import static rk.tools.objectxpath.xpath.XPathNodeType.*;
 import static rk.utils.reflection.ReflectionUtils.*;
 
 public class XXPath {
 
     private static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
-            XPathNodeType.ROOT,
-            XPathNodeType.PARENT,
-            XPathNodeType.ANY_WITH_ATTRIBUTE,
-            XPathNodeType.ANY_WITH_INDEX,
-            XPathNodeType.WITH_ATTRIBUTE,
-            XPathNodeType.WITH_INDEX,
-            XPathNodeType.ANY,
-            XPathNodeType.SIMPLE,
-            XPathNodeType.ATTRIBUTE
+            ROOT_NODE,
+            PARENT_NODE,
+            ANY_NODE_WITH_ATTRIBUTE,
+            ANY_NODE_WITH_INDEX,
+            NODE_WITH_ATTRIBUTE,
+            NODE_WITH_INDEX,
+            ANY_NODE,
+            SIMPLE_NODE,
+            NODE_ATTRIBUTE
     );
 
     /**
@@ -51,55 +52,6 @@ public class XXPath {
         primitiveTypes.add(String.class);
     }
 
-    /**
-     * Finds XPath node in provided XPath string.
-     *
-     * @param xPath XPath string
-     * @return {@link Optional} of {@link XPathNode}
-     */
-    private Optional<XPathNode> findNextXPathNode(String xPath) {
-        for (XPathNodeType nodeType : NODE_TYPES) {
-            Matcher matcher = nodeType.pattern.matcher(xPath);
-            if (nodeType.matches(matcher)) {
-                return Optional.of(nodeType.create(matcher));
-            }
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Parses provided XPath string and converts it
-     * into a list of {@link XPathNode}.
-     *
-     * @param xPath XPath string
-     * @return list of {@link XPathNode}
-     */
-    private List<XPathNode> parseXPath(String xPath) {
-        List<XPathNode> nodes = new LinkedList<>();
-        Optional<XPathNode> node_;
-        while ((node_ = findNextXPathNode(xPath)).isPresent()) {
-            XPathNode node = node_.get();
-            nodes.add(node);
-            xPath = xPath.substring(node.endIndex);
-        }
-        return nodes;
-    }
-
-    private boolean nodeHasAttribute(Node node, String attrName, Object attrValue) {
-        return node.value != null && getFieldValue(attrName, node.value)
-                .filter(attr -> Objects.equals(attrValue, attr)).isPresent();
-    }
-
-    private Optional<Node> getNodeWithIndex(List<Node> nodes, int index) {
-        if (nodes.size() == 0) {
-            return Optional.empty();
-        }
-        if (index >= nodes.size()) {
-            return Optional.empty();
-        }
-        return Optional.of(nodes.get(index));
-    }
-
     public Object process(String xPath, Object object) {
         if (object == null) {
             throw new IllegalArgumentException("object cannot be null");
@@ -111,7 +63,7 @@ public class XXPath {
         while (xPathNodes.size() > 0) {
             XPathNode xPathNode = xPathNodes.remove(0);
             boolean lastXpathNode = xPathNodes.isEmpty();
-            if (xPathNode.type == XPathNodeType.ROOT) {
+            if (xPathNode.type == ROOT_NODE) {
                 result.add(nodes.get(0));
                 break;
             }
@@ -171,21 +123,67 @@ public class XXPath {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Finds XPath node in provided XPath string.
+     *
+     * @param xPath XPath string
+     * @return {@link Optional} of {@link XPathNode}
+     */
+    private Optional<XPathNode> findNextXPathNode(String xPath) {
+        for (XPathNodeType nodeType : NODE_TYPES) {
+            Matcher matcher = nodeType.pattern.matcher(xPath);
+            if (nodeType.matches(matcher)) {
+                return Optional.of(nodeType.create(matcher));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Parses provided XPath string and converts it
+     * into a list of {@link XPathNode}.
+     *
+     * @param xPath XPath string
+     * @return list of {@link XPathNode}
+     */
+    private List<XPathNode> parseXPath(String xPath) {
+        List<XPathNode> nodes = new LinkedList<>(); //LinkedList for better 'remove' performance
+        Optional<XPathNode> node_;
+        while ((node_ = findNextXPathNode(xPath)).isPresent()) {
+            XPathNode node = node_.get();
+            nodes.add(node);
+            xPath = xPath.substring(node.endIndex);
+        }
+        return nodes;
+    }
+
+    private boolean nodeHasAttribute(Node node, String attrName, Object attrValue) {
+        return node.value != null && getFieldValue(attrName, node.value)
+                .filter(attr -> Objects.equals(attrValue, attr)).isPresent();
+    }
+
+    private Optional<Node> getNodeWithIndex(List<Node> nodes, int index) {
+        if (nodes.size() == 0) {
+            return Optional.empty();
+        }
+        if (index >= nodes.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(nodes.get(index));
+    }
+
     private boolean xPathNodeWithIndex(XPathNode xPathNode) {
-        return xPathNode.type == XPathNodeType.ANY_WITH_INDEX
-                || xPathNode.type == XPathNodeType.WITH_INDEX;
+        return xPathNode.type == ANY_NODE_WITH_INDEX || xPathNode.type == NODE_WITH_INDEX;
     }
 
     private boolean xPathNodeWithAttribute(XPathNode xPathNode) {
-        return xPathNode.type == XPathNodeType.ANY_WITH_ATTRIBUTE
-                || xPathNode.type == XPathNodeType.WITH_ATTRIBUTE;
+        return xPathNode.type == ANY_NODE_WITH_ATTRIBUTE || xPathNode.type == NODE_WITH_ATTRIBUTE;
     }
 
-    //todo rename
     private boolean nodeMatchesXpathNode(Node node, XPathNode xPathNode) {
         if (xPathNodeWithAttribute(xPathNode)) {
-            return nodeHasAttribute(node, ((NodeWithAttribute) xPathNode).attrName,
-                    ((NodeWithAttribute) xPathNode).attrValue);
+            NodeWithAttribute nodeWithAttribute = (NodeWithAttribute) xPathNode;
+            return nodeHasAttribute(node, nodeWithAttribute.attrName, nodeWithAttribute.attrValue);
         }
         return true;
     }
@@ -223,10 +221,10 @@ public class XXPath {
     }
 
     private List<Node> findNextNode(Node parent, XPathNode xPathNode) {
-        if (xPathNode.type == XPathNodeType.PARENT) {
+        if (xPathNode.type == PARENT_NODE) {
             return parent.parent == null ? emptyList() : arrayListOf(parent.parent);
         }
-        if (xPathNode.type == XPathNodeType.ATTRIBUTE) {
+        if (xPathNode.type == NODE_ATTRIBUTE) {
             return findAttributeNode(parent, xPathNode);
         }
         List<Node> nodes = arrayListOf();
@@ -236,7 +234,7 @@ public class XXPath {
             } else if (child.name.equals(xPathNode.name)) {
                 nodes.add(child);
             }
-            if (xPathNode.relationship == NodeRelationship.DESCENDANT) { //todo check for primitive node
+            if (xPathNode.relationship == NodeRelationship.DESCENDANT) {
                 nodes.addAll(findNextNode(child, xPathNode));
             }
         }
@@ -244,9 +242,9 @@ public class XXPath {
     }
 
     private boolean anyXpathNode(XPathNode xPathNode) {
-        return xPathNode.type == XPathNodeType.ANY_WITH_ATTRIBUTE
-                || xPathNode.type == XPathNodeType.ANY_WITH_INDEX
-                || xPathNode.type == XPathNodeType.ANY;
+        return xPathNode.type == ANY_NODE_WITH_ATTRIBUTE
+                || xPathNode.type == ANY_NODE_WITH_INDEX
+                || xPathNode.type == ANY_NODE;
     }
 
     /**
