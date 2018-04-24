@@ -16,10 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static rk.tools.objectxpath.Lists.arrayListOf;
 
 @SuppressWarnings("unchecked")
-class XPathTest {
-    XXPath xxPath = new XXPath();
+class ObjectXpathTest {
+    final ObjectXpath oxp = new ObjectXpath();
     Sedan sedan;
-
     Object result;
     List list;
 
@@ -96,7 +95,6 @@ class XPathTest {
     //todo map with number key
     //todo collection as root
 
-
     @Test
     void test() {
     }
@@ -104,13 +102,13 @@ class XPathTest {
     @Test
     void listAsRoot() {
         List<String> list = arrayListOf("h1", "h2");
-        this.result = xxPath.process("/", list);
+        this.result = oxp.process("/", list);
         assertEquals(list, result);
-        this.list = (List) xxPath.process("/*", list);
+        this.list = (List) oxp.process("/*", list);
         assertEquals(2, this.list.size());
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
-        this.list = (List) xxPath.process("//*", list);
+        this.list = (List) oxp.process("//*", list);
         assertEquals(2, this.list.size());
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
@@ -118,15 +116,15 @@ class XPathTest {
 
     @Test
     void primitiveAsRoot() {
-        result = xxPath.process("/", 25);
+        result = oxp.process("/", 25);
         assertEquals(25, result);
-        result = xxPath.process("/", "25");
+        result = oxp.process("/", "25");
         assertEquals("25", result);
-        result = xxPath.process("/", 22.6);
+        result = oxp.process("/", 22.6);
         assertEquals(22.6, result);
-        result = xxPath.process("/value", 25);
+        result = oxp.process("/value", 25);
         assertNull(result);
-        result = xxPath.process("/*", 25);
+        result = oxp.process("/*", 25);
         assertNull(result);
     }
 
@@ -135,15 +133,15 @@ class XPathTest {
         Map<String, String> map = new HashMap<>();
         map.put("record-11", "details-11");
         map.put("record-12", "details-12");
-        result = xxPath.process("/record-11", map);
+        result = oxp.process("/record-11", map);
         assertEquals("details-11", result);
-        result = xxPath.process("/record-12", map);
+        result = oxp.process("/record-12", map);
         assertEquals("details-12", result);
-        list = (List) xxPath.process("/*", map);
+        list = (List) oxp.process("/*", map);
         assertEquals(2, list.size());
         assertTrue(list.stream().anyMatch(item -> item.equals("details-11")));
         assertTrue(list.stream().anyMatch(item -> item.equals("details-12")));
-        list = (List) xxPath.process("//*", map);
+        list = (List) oxp.process("//*", map);
         assertEquals(2, list.size());
         assertTrue(list.stream().anyMatch(item -> item.equals("details-11")));
         assertTrue(list.stream().anyMatch(item -> item.equals("details-12")));
@@ -152,19 +150,19 @@ class XPathTest {
     @Test
     void mapWithComplexStringKeys() {
         sedan.details.put("detail-21", "details");
-        result = xxPath.process("/details/detail-21", sedan);
+        result = oxp.process("/details/detail-21", sedan);
         assertEquals("details", result);
-        result = xxPath.process("/details/d1", sedan);
+        result = oxp.process("/details/d1", sedan);
         assertEquals(sedan.details.get("d1"), result);
         sedan.details.clear();
-        result = xxPath.process("/details/detail-21", sedan);
+        result = oxp.process("/details/detail-21", sedan);
         assertNull(result);
     }
 
     @Test
     void emptyMap() {
         sedan.details.clear();
-        result = xxPath.process("/details/detail1", sedan);
+        result = oxp.process("/details/detail1", sedan);
         assertNull(result);
     }
 
@@ -299,11 +297,19 @@ class XPathTest {
 
     @Test
     void nullObject() {
-        assertThrows(IllegalArgumentException.class, () -> xxPath.process("/", null));
+        assertThrows(IllegalArgumentException.class, () -> oxp.process("/", null));
+    }
+
+    @Test
+    void processNegative() {
+        assertThrows(NullPointerException.class, () -> checkInvalidXpath(null));
+        checkInvalidXpath("/engine/");
+        checkInvalidXpath("///");
+        checkInvalidXpath("/[]");
     }
 
     Object processXpath(String xPath) {
-        return xxPath.process(xPath, sedan);
+        return oxp.process(xPath, sedan);
     }
 
     void checkInvalidXpath(String xPath) {
@@ -313,13 +319,5 @@ class XPathTest {
             return;
         }
         throw new AssertionError(xPath + " was treated like valid XPath expression");
-    }
-
-    @Test
-    void processNegative() {
-        assertThrows(NullPointerException.class, () -> checkInvalidXpath(null));
-        checkInvalidXpath("/engine/");
-        checkInvalidXpath("///");
-        checkInvalidXpath("/[]");
     }
 }

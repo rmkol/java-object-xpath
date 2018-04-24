@@ -21,7 +21,7 @@ import static rk.tools.objectxpath.Lists.transformList;
 import static rk.tools.objectxpath.xpath.XPathNodeType.*;
 import static rk.utils.reflection.ReflectionUtils.*;
 
-public class XXPath {
+public class ObjectXpath {
 
     private static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
             ROOT_NODE,
@@ -52,6 +52,7 @@ public class XXPath {
         primitiveTypes.add(String.class);
     }
 
+    //todo add javadoc here
     public Object process(String xPath, Object object) {
         if (object == null) {
             throw new IllegalArgumentException("object cannot be null");
