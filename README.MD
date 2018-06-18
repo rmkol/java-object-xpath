@@ -20,7 +20,7 @@ class Vehicle {
 final Vehicle vehicle = new Vehicle();
 ...
 
-final String xpath = "/gears[1]/characteristics/characteristics[@key='some-key']";
+final String xpath = "/gears[1]/characteristics/characteristic[@key='some-key']";
 final Object characteristic = ObjectXpath.process(xpath, vehicle); 
 ```
 
