@@ -2,7 +2,7 @@
 A library that allows to access object fields using XPath queries.
 
 ### Examples
-```
+```java
 class Characteristic {
     String key;
     String value;
