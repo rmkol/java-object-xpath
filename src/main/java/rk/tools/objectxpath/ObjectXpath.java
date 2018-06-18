@@ -58,9 +58,11 @@ public class ObjectXpath {
             throw new IllegalArgumentException("object cannot be null");
         }
         checkXpathExpression(xPath);
+
         List<XPathNode> xPathNodes = parseXPath(xPath);
         List<Node> nodes = arrayListOf(objectToTree(object));
         List<Node> result = arrayListOf();
+
         while (xPathNodes.size() > 0) {
             XPathNode xPathNode = xPathNodes.remove(0);
             boolean lastXpathNode = xPathNodes.isEmpty();

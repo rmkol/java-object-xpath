@@ -104,14 +104,23 @@ class ObjectXpathTest {
         List<String> list = arrayListOf("h1", "h2");
         this.result = oxp.process("/", list);
         assertEquals(list, result);
+
         this.list = (List) oxp.process("/*", list);
         assertEquals(2, this.list.size());
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
+
         this.list = (List) oxp.process("//*", list);
         assertEquals(2, this.list.size());
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h1")));
         assertTrue(this.list.stream().anyMatch(item -> item.equals("h2")));
+
+        this.result = oxp.process("/*[1]", list);
+        assertNotNull(this.result);
+        assertEquals("h1", this.result);
+
+        this.result = oxp.process("/*[3]", list);
+        assertNull(this.result);
     }
 
     @Test

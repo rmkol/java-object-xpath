@@ -13,6 +13,7 @@ public class Lists {
         return result;
     }
 
+    @SafeVarargs
     public static <T> ArrayList<T> arrayListOf(T... items) {
         if (items == null || items.length == 0) {
             return new ArrayList<>();
