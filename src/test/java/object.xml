@@ -8,8 +8,7 @@
             details2
         </d2>
     </details>
-    <materials>
-    </materials>
+    <!-- null 'materials' here-->
     <gears>
         <Gear id="111" name="gear_1" weight="1.2">
             <characteristics>
@@ -41,7 +40,9 @@
         </item>
     </countryCodes>
     <engine volume="2.0">
+        <!--null 'characteristics' here-->
         <valve id="15" name="valve">
+            <!--null 'characteristics' here-->
         </valve>
         <gears>
             <Gear id="311" name="gear_31" weight="11">

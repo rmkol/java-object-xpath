@@ -16,12 +16,13 @@ import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static rk.tools.objectxpath.Lists.arrayListOf;
 import static rk.tools.objectxpath.Lists.transformList;
 import static rk.tools.objectxpath.xpath.XPathNodeType.*;
 import static rk.utils.reflection.ReflectionUtils.*;
 
-public class ObjectXpath {
+public class OXPy {
 
     private static final List<XPathNodeType> NODE_TYPES = arrayListOf( //order is important here
             ROOT_NODE,
@@ -52,14 +53,23 @@ public class ObjectXpath {
         primitiveTypes.add(String.class);
     }
 
-    //todo add javadoc here
-    public Object process(String xPath, Object object) {
-        if (object == null) {
-            throw new IllegalArgumentException("object cannot be null");
-        }
-        checkXpathExpression(xPath);
+    /**
+     * Processes XPath query for the given {@code object}
+     * and returns processing result.
+     *
+     * @param xPathQuery XPath query
+     * @param object     an object for which query should be applied
+     * @return query processing result.
+     * may return a single object or a list of objects if provided query resulted in several nodes.
+     */
+    public Optional<Object> process(String xPathQuery, Object object) {
+        requireNonNull(xPathQuery, "xPathQuery cannot be null");
+        requireNonNull(object, "object cannot be null");
 
-        List<XPathNode> xPathNodes = parseXPath(xPath);
+        //todo allow to disable xpath check through configuration (for better performance)
+        checkXpathExpression(xPathQuery);
+
+        List<XPathNode> xPathNodes = parseXPath(xPathQuery);
         List<Node> nodes = arrayListOf(objectToTree(object));
         List<Node> result = arrayListOf();
 
@@ -72,19 +82,19 @@ public class ObjectXpath {
             }
             for (Node node : Lists.removeAll(nodes)) {
                 List<Node> foundNodes = findNextNode(node, xPathNode);
+                if (xPathNodeWithIndex(xPathNode)) {
+                    int index = ((NodeWithIndex) xPathNode).index - 1;
+                    Optional<Node> _node = getNodeWithIndex(foundNodes, index);
+                    if (_node.isPresent()) {
+                        nodes.add(_node.get());
+                        if (lastXpathNode) {
+                            result.add(_node.get());
+                        }
+                    }
+                    continue;
+                }
                 if (foundNodes.size() == 1) {
                     node = foundNodes.get(0);
-                    if (xPathNodeWithIndex(xPathNode)) { //one node returned, pick a child with index
-                        int index = ((NodeWithIndex) xPathNode).index - 1;
-                        Optional<Node> child = getNodeWithIndex(node.children, index);
-                        if (child.isPresent()) {
-                            nodes.add(child.get());
-                            if (lastXpathNode) {
-                                result.add(child.get());
-                            }
-                        }
-                        continue;
-                    }
                     if (nodeMatchesXpathNode(node, xPathNode)) {
                         nodes.add(node);
                         if (lastXpathNode) {
@@ -92,17 +102,6 @@ public class ObjectXpath {
                         }
                     }
                 } else {
-                    if (xPathNodeWithIndex(xPathNode)) { //multiple nodes returned, pick a node with index
-                        int index = ((NodeWithIndex) xPathNode).index - 1;
-                        Optional<Node> _node = getNodeWithIndex(foundNodes, index);
-                        if (_node.isPresent()) {
-                            nodes.add(_node.get());
-                            if (lastXpathNode) {
-                                result.add(_node.get());
-                            }
-                        }
-                        continue;
-                    }
                     foundNodes.forEach(_node -> {
                         if (nodeMatchesXpathNode(_node, xPathNode)) {
                             nodes.add(_node);
@@ -114,20 +113,21 @@ public class ObjectXpath {
                 }
             }
         }
-        result.removeIf(node -> node.value == null);
         if (result.size() == 0) {
-            return null;
+            return Optional.empty();
         }
         if (result.size() == 1) {
-            return result.get(0).value;
+            return Optional.ofNullable(result.get(0).value);
         }
-        return result.stream()
-                .map(node -> node.value)
-                .collect(Collectors.toList());
+        return Optional.of(
+                result.stream()
+                        .map(node -> node.value)
+                        .collect(Collectors.toList())
+        );
     }
 
     /**
-     * Finds XPath node in provided XPath string.
+     * Finds XPath node matching provided XPath string.
      *
      * @param xPath XPath string
      * @return {@link Optional} of {@link XPathNode}
@@ -208,6 +208,7 @@ public class ObjectXpath {
         }
     }
 
+    @SuppressWarnings("CodeBlock2Expr")
     private List<Node> findAttributeNode(Node node, XPathNode xPathNode) {
         List<Node> nodes = arrayListOf();
         for (Node attr : node.attributes) {
@@ -301,13 +302,32 @@ public class ObjectXpath {
 
     private void processCollectionNode(Node node) {
         Collection collection = (Collection) node.value;
-        if (collection.size() > 0) {
-            node.children = new ArrayList<>(collection.size());
+        if (collection.isEmpty()) {
+            return;
         }
+        node.children = new ArrayList<>(collection.size());
+
+        Iterator iterator = collection.iterator();
+        Object element = null;
+        while (iterator.hasNext()) {
+            element = iterator.next();
+            if (element != null) {
+                break;
+            }
+        }
+        if (element == null) { //all items are null
+            return;
+        }
+
+        //todo check that all items in collection are of the same type
+        String itemName = isPrimitive(element)
+                ? "item"
+                : getNameFor(element);
+
         int i = 1;
         for (Object item : collection) {
             if (item != null) {
-                node.children.add(toNode(node, item, getNameFor(item), i++));
+                node.children.add(toNode(node, item, itemName, i++));
             }
         }
     }
@@ -344,13 +364,13 @@ public class ObjectXpath {
                 -> toNode(node, ReflectionUtils.getFieldValue(field, node.value), field.getName(), null));
     }
 
-    //TODO allow to customize primitive types
+    //TODO allow to customize primitive types?
     private static boolean isPrimitive(Field field) {
         Class type = field.getType();
         return type.isPrimitive() || primitiveTypes.contains(type);
     }
 
-    //TODO allow to customize primitive types
+    //TODO allow to customize primitive types?
     private static boolean isPrimitive(Object object) {
         Class type = object.getClass();
         return type.isPrimitive() || primitiveTypes.contains(type);
@@ -377,7 +397,7 @@ public class ObjectXpath {
     private class Node {
         Node parent;
         String name;
-        String path;
+        String path; //todo remove path field? as it is never used
         Object value;
         List<Node> attributes = emptyList();
         List<Node> children = emptyList();

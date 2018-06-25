@@ -1,5 +1,5 @@
-# Java Object XPath
-A library that allows to access object fields using XPath queries.
+# OXPy (Object XPath)
+A Java library that allows to access object fields using XPath queries.
 
 ### Examples
 ```java
@@ -17,14 +17,16 @@ class Vehicle {
     List<Gear> gears;
 }
 
-final Vehicle vehicle = new Vehicle();
+Vehicle vehicle = new Vehicle();
 ...
 
-final String xpath = "/gears[1]/characteristics/characteristic[@key='some-key']";
-final Object characteristic = ObjectXpath.process(xpath, vehicle); 
+OXPy oxpy = new OXPy();
+String xpath = "/gears[1]/characteristics/characteristic[@key='some-key']";
+Optional<Object> characteristic = oxpy.process(xpath, vehicle);
+assert characteristic.isPresent();
 ```
 
-For more examples please see [ObjectXpathTest](https://github.com/rmkol/java-object-xpath/blob/master/src/test/java/rk/tools/objectxpath/ObjectXpathTest.java) test class.
+For more examples please see [OXPyTest](https://github.com/rmkol/java-object-xpath/blob/master/src/test/java/rk/tools/objectxpath/OXPyTest.java) test class.
 
 ### Building
 This project depends on [Java Reflection Utils](https://github.com/rmkol/java-reflection-utils) project.
